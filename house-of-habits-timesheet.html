@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>House of Habits — Timesheet</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --green: #1a3a2a;
+    --green-mid: #2d6a48;
+    --green-light: #4a9e72;
+    --green-pale: #e8f3ed;
+    --green-muted: #c2dccb;
+    --cream: #faf8f4;
+    --cream-dark: #f0ece4;
+    --text: #1a1a18;
+    --text-muted: #5a5a52;
+    --text-light: #9a9a8a;
+    --white: #ffffff;
+    --border: rgba(26,58,42,0.12);
+    --border-strong: rgba(26,58,42,0.25);
+    --danger: #c0392b;
+    --danger-pale: #fdf0ee;
+    --shadow: 0 2px 12px rgba(26,58,42,0.08);
+    --shadow-lg: 0 8px 32px rgba(26,58,42,0.12);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* ── HIDDEN PAGES ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── AUTH PAGE ── */
+  #page-auth {
+    min-height: 100vh;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--green);
+    padding: 2rem;
+  }
+  #page-auth.active { display: flex; }
+
+  .auth-card {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .auth-logo {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  .auth-logo .logo-mark {
+    width: 64px; height: 64px;
+    background: var(--green);
+    border-radius: 16px;
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-bottom: 1rem;
+  }
+  .auth-logo .logo-mark svg { width: 36px; height: 36px; }
+  .auth-logo h1 { font-size: 20px; font-weight: 600; color: var(--green); letter-spacing: -0.3px; }
+  .auth-logo p { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+  .lang-toggle {
+    display: flex;
+    background: var(--cream);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    margin-bottom: 1.5rem;
+  }
+  .lang-btn {
+    flex: 1; padding: 6px; border: none; background: none;
+    border-radius: 6px; cursor: pointer; font-size: 13px;
+    font-family: var(--font); font-weight: 500; color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .lang-btn.active {
+    background: var(--white); color: var(--green);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+
+  .form-group { margin-bottom: 1rem; }
+  .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
+  .form-group input, .form-group select {
+    width: 100%; padding: 10px 14px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--radius-sm); font-size: 15px;
+    font-family: var(--font); color: var(--text);
+    background: var(--white); outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--green-light); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 11px 20px; border-radius: var(--radius-sm);
+    font-family: var(--font); font-size: 15px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; border: none; text-decoration: none;
+  }
+  .btn-primary { background: var(--green); color: var(--white); width: 100%; }
+  .btn-primary:hover { background: var(--green-mid); }
+  .btn-outline {
+    background: none; border: 1.5px solid var(--border-strong);
+    color: var(--text);
+  }
+  .btn-outline:hover { background: var(--cream); }
+  .btn-danger { background: var(--danger); color: var(--white); }
+  .btn-danger:hover { background: #a93226; }
+  .btn-sm { padding: 7px 14px; font-size: 13px; }
+  .btn-icon { padding: 8px; border-radius: var(--radius-sm); }
+
+  .auth-divider { text-align: center; font-size: 13px; color: var(--text-light); margin: 1rem 0; }
+  .auth-link { color: var(--green-mid); cursor: pointer; text-decoration: underline; font-size: 13px; text-align: center; display: block; margin-top: 1rem; }
+  .error-msg { color: var(--danger); font-size: 13px; margin-top: 6px; }
+
+  /* ── APP SHELL ── */
+  #page-app { display: none; flex-direction: column; min-height: 100vh; }
+  #page-app.active { display: flex; }
+
+  .topbar {
+    background: var(--green);
+    color: var(--white);
+    padding: 0 1.5rem;
+    height: 60px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
+  .topbar-logo {
+    font-size: 16px; font-weight: 600; letter-spacing: -0.2px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .topbar-logo .dot {
+    width: 28px; height: 28px; background: rgba(255,255,255,0.15);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  }
+  .topbar-user { font-size: 13px; opacity: 0.75; }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  .topbar-btn {
+    background: rgba(255,255,255,0.12); border: none; color: var(--white);
+    padding: 6px 12px; border-radius: var(--radius-sm); cursor: pointer;
+    font-size: 13px; font-family: var(--font); font-weight: 500;
+    transition: background 0.15s; display: flex; align-items: center; gap: 6px;
+  }
+  .topbar-btn:hover { background: rgba(255,255,255,0.2); }
+
+  .app-content { flex: 1; padding: 2rem 1.5rem; max-width: 900px; margin: 0 auto; width: 100%; }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex; gap: 4px; margin-bottom: 2rem;
+    background: var(--cream-dark); border-radius: var(--radius);
+    padding: 4px;
+  }
+  .tab-btn {
+    flex: 1; padding: 9px 16px; border: none; background: none;
+    border-radius: var(--radius-sm); cursor: pointer;
+    font-size: 14px; font-weight: 500; color: var(--text-muted);
+    font-family: var(--font); transition: all 0.15s; white-space: nowrap;
+  }
+  .tab-btn.active {
+    background: var(--white); color: var(--green);
+    box-shadow: var(--shadow);
+  }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--white); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 1.5rem;
+    box-shadow: var(--shadow);
+  }
+  .card + .card { margin-top: 1rem; }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+  .card-title { font-size: 16px; font-weight: 600; color: var(--green); }
+  .card-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── STATS ROW ── */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px; margin-bottom: 1.5rem;
+  }
+  .stat-card {
+    background: var(--green-pale); border-radius: var(--radius);
+    padding: 1rem 1.25rem; border: 1px solid var(--green-muted);
+  }
+  .stat-label { font-size: 12px; color: var(--green-mid); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-value { font-size: 24px; font-weight: 600; color: var(--green); margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── ENTRY FORM ── */
+  .entry-form {
+    display: grid; grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 12px; align-items: end;
+  }
+  @media (max-width: 600px) {
+    .entry-form { grid-template-columns: 1fr 1fr; }
+    .entry-form .btn { grid-column: span 2; }
+  }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th {
+    text-align: left; padding: 10px 12px;
+    font-size: 12px; font-weight: 500; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    background: var(--cream); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td { padding: 11px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--cream); }
+  .td-mono { font-family: var(--mono); font-size: 13px; }
+  .td-day { color: var(--text-muted); font-size: 13px; }
+  .td-duration { font-weight: 600; color: var(--green); }
+  .td-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+  /* ── MONTH FILTER ── */
+  .month-nav {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .month-chip {
+    padding: 5px 12px; border-radius: 20px; font-size: 13px;
+    border: 1.5px solid var(--border-strong); background: none;
+    cursor: pointer; font-family: var(--font); font-weight: 500;
+    color: var(--text-muted); transition: all 0.15s; white-space: nowrap;
+  }
+  .month-chip.active {
+    background: var(--green); color: var(--white); border-color: var(--green);
+  }
+
+  /* ── ADMIN ── */
+  .employee-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px; margin-bottom: 1.5rem;
+  }
+  .emp-card {
+    background: var(--white); border-radius: var(--radius);
+    border: 1.5px solid var(--border); padding: 1rem;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .emp-card:hover { border-color: var(--green-light); box-shadow: var(--shadow); }
+  .emp-card.selected { border-color: var(--green); background: var(--green-pale); }
+  .emp-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--green); color: var(--white);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 600; margin-bottom: 8px;
+  }
+  .emp-name { font-weight: 600; font-size: 15px; }
+  .emp-role { font-size: 12px; color: var(--text-muted); }
+  .emp-hours { font-size: 13px; color: var(--green-mid); font-weight: 500; margin-top: 4px; }
+
+  /* ── SUMMARY TABLE ── */
+  .summary-header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 1.25rem;
+  }
+  .export-btns { display: flex; gap: 8px; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; padding: 1rem; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--white); border-radius: 16px;
+    padding: 1.75rem; width: 100%; max-width: 440px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    transform: translateY(10px); transition: transform 0.2s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 1.25rem; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.5rem; }
+
+  /* ── EMPTY STATE ── */
+  .empty {
+    text-align: center; padding: 3rem 1rem; color: var(--text-muted);
+  }
+  .empty-icon { font-size: 40px; margin-bottom: 1rem; opacity: 0.4; }
+  .empty h3 { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
+  .empty p { font-size: 14px; }
+
+  /* ── BADGE ── */
+  .badge {
+    display: inline-block; padding: 3px 8px; border-radius: 6px;
+    font-size: 12px; font-weight: 500;
+  }
+  .badge-green { background: var(--green-pale); color: var(--green); }
+  .badge-gray { background: var(--cream-dark); color: var(--text-muted); }
+
+  /* ── MOBILE ── */
+  @media (max-width: 500px) {
+    .topbar { padding: 0 1rem; }
+    .app-content { padding: 1rem; }
+    .tabs { flex-wrap: wrap; }
+    .entry-form { grid-template-columns: 1fr; }
+    .entry-form .btn { width: 100%; }
+    .export-btns { flex-wrap: wrap; }
+  }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(100px);
+    background: var(--green); color: var(--white); padding: 12px 20px;
+    border-radius: var(--radius); font-size: 14px; font-weight: 500;
+    box-shadow: var(--shadow-lg); z-index: 300; transition: transform 0.3s;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── INLINE EDIT ── */
+  .inline-input {
+    width: 90px; padding: 4px 8px; border: 1.5px solid var(--green-light);
+    border-radius: 6px; font-size: 13px; font-family: var(--mono);
+    background: var(--white); color: var(--text); outline: none;
+  }
+
+  /* ── ADMIN NAV ── */
+  .admin-emp-select {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 1.25rem; flex-wrap: wrap;
+  }
+  .admin-emp-select label { font-size: 13px; font-weight: 500; color: var(--text-muted); white-space: nowrap; }
+  .admin-emp-select select {
+    padding: 8px 12px; border: 1.5px solid var(--border-strong);
+    border-radius: var(--radius-sm); font-size: 14px;
+    font-family: var(--font); color: var(--text); background: var(--white); outline: none;
+    flex: 1; min-width: 160px; max-width: 260px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+     AUTH PAGE
+══════════════════════════════════ -->
+<div id="page-auth" class="page active">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 6C11.373 6 6 11.373 6 18s5.373 12 12 12 12-5.373 12-12S24.627 6 18 6zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm0 6c3.314 0 6 2.686 6 6H12c0-3.314 2.686-6 6-6z" fill="white"/>
+        </svg>
+      </div>
+      <h1>House of Habits</h1>
+      <p id="auth-subtitle">Employee Time Tracking</p>
+    </div>
+
+    <div class="lang-toggle">
+      <button class="lang-btn active" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" onclick="setLang('nl')">NL</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="form-login">
+      <div class="form-group">
+        <label id="lbl-email">Email address</label>
+        <input type="email" id="login-email" placeholder="you@houseofhabits.nl" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label id="lbl-password">Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div id="login-error" class="error-msg" style="display:none;margin-bottom:10px;"></div>
+      <button class="btn btn-primary" onclick="doLogin()" id="btn-login">Sign in</button>
+      <a class="auth-link" onclick="showForm('register')" id="link-to-register">Don't have an account? Sign up</a>
+    </div>
+
+    <!-- Register Form -->
+    <div id="form-register" style="display:none;">
+      <div class="form-group">
+        <label id="lbl-name">Full name</label>
+        <input type="text" id="reg-name" placeholder="Your name">
+      </div>
+      <div class="form-group">
+        <label id="lbl-role">Role</label>
+        <select id="reg-role">
+          <option value="trainer">Trainer</option>
+          <option value="frontdesk">Front Desk</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label id="lbl-email2">Email address</label>
+        <input type="email" id="reg-email" placeholder="you@houseofhabits.nl">
+      </div>
+      <div class="form-group">
+        <label id="lbl-password2">Password</label>
+        <input type="password" id="reg-password" placeholder="Min. 6 characters">
+      </div>
+      <div id="reg-error" class="error-msg" style="display:none;margin-bottom:10px;"></div>
+      <button class="btn btn-primary" onclick="doRegister()" id="btn-register">Create account</button>
+      <a class="auth-link" onclick="showForm('login')" id="link-to-login">Already have an account? Sign in</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     MAIN APP
+══════════════════════════════════ -->
+<div id="page-app" class="page">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">
+        <div class="dot">
+          <svg width="16" height="16" viewBox="0 0 36 36" fill="none">
+            <path d="M18 6C11.373 6 6 11.373 6 18s5.373 12 12 12 12-5.373 12-12S24.627 6 18 6zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm0 6c3.314 0 6 2.686 6 6H12c0-3.314 2.686-6 6-6z" fill="white"/>
+          </svg>
+        </div>
+        House of Habits
+      </div>
+      <span class="topbar-user" id="topbar-username"></span>
+    </div>
+    <div class="topbar-right">
+      <div class="lang-toggle" style="background:rgba(255,255,255,0.1);margin:0;">
+        <button class="lang-btn active" onclick="setLang('en')" id="topbar-en">EN</button>
+        <button class="lang-btn" onclick="setLang('nl')" id="topbar-nl">NL</button>
+      </div>
+      <button class="topbar-btn" onclick="doLogout()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        <span id="btn-signout">Sign out</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="app-content">
+    <!-- Employee view tabs -->
+    <div class="tabs" id="employee-tabs">
+      <button class="tab-btn active" onclick="showTab('my-time')" id="tab-mytime">My Timesheet</button>
+      <button class="tab-btn" onclick="showTab('my-summary')" id="tab-mysummary">Monthly Summary</button>
+    </div>
+
+    <!-- Admin view tabs -->
+    <div class="tabs" id="admin-tabs" style="display:none;">
+      <button class="tab-btn active" onclick="showTab('admin-overview')" id="tab-overview">Overview</button>
+      <button class="tab-btn" onclick="showTab('admin-employee')" id="tab-empdetail">Employee Detail</button>
+      <button class="tab-btn" onclick="showTab('admin-summary')" id="tab-adminsum">Monthly Summary</button>
+      <button class="tab-btn" onclick="showTab('admin-manage')" id="tab-manage">Manage Users</button>
+    </div>
+
+    <!-- ── MY TIMESHEET ── -->
+    <div id="view-my-time">
+      <div class="stats-row" id="my-stats-row"></div>
+
+      <div class="card" style="margin-bottom:1rem;">
+        <div class="card-header">
+          <div><div class="card-title" id="lbl-addentry">Add Entry</div></div>
+        </div>
+        <div class="entry-form">
+          <div class="form-group" style="margin:0;">
+            <label id="lbl-date">Date</label>
+            <input type="date" id="entry-date">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label id="lbl-start">Start time</label>
+            <input type="time" id="entry-start">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label id="lbl-end">End time</label>
+            <input type="time" id="entry-end">
+          </div>
+          <button class="btn btn-primary" onclick="addEntry()" id="btn-addentry">Add</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title" id="lbl-entries">Time entries</div>
+            <div class="card-subtitle" id="my-month-label"></div>
+          </div>
+          <div class="month-nav" id="my-month-nav"></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th id="th-date">Date</th>
+                <th id="th-day">Day</th>
+                <th id="th-start">Start</th>
+                <th id="th-end">End</th>
+                <th id="th-duration">Duration</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="my-entries-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MY SUMMARY ── -->
+    <div id="view-my-summary" style="display:none;">
+      <div class="card">
+        <div class="summary-header">
+          <div>
+            <div class="card-title" id="lbl-mysummary">My Monthly Summary</div>
+            <div class="card-subtitle" id="my-summary-sub"></div>
+          </div>
+          <div class="export-btns">
+            <select id="my-export-month" class="form-group" style="padding:8px 12px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);font-family:var(--font);font-size:14px;color:var(--text);background:var(--white);outline:none;margin:0;">
+            </select>
+            <button class="btn btn-outline btn-sm" onclick="exportMyPDF()" id="btn-mypdf">PDF</button>
+            <button class="btn btn-outline btn-sm" onclick="exportMyExcel()" id="btn-myexcel">Excel</button>
+          </div>
+        </div>
+        <div id="my-summary-content"></div>
+      </div>
+    </div>
+
+    <!-- ── ADMIN OVERVIEW ── -->
+    <div id="view-admin-overview" style="display:none;">
+      <div class="stats-row" id="admin-global-stats"></div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" id="lbl-allemployees">All Employees</div>
+          <div class="month-nav" id="admin-month-nav"></div>
+        </div>
+        <div class="employee-grid" id="admin-emp-grid"></div>
+      </div>
+    </div>
+
+    <!-- ── ADMIN EMPLOYEE DETAIL ── -->
+    <div id="view-admin-employee" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title" id="lbl-empdetail">Employee Detail</div>
+          </div>
+          <div class="admin-emp-select">
+            <label id="lbl-selectemp">Employee:</label>
+            <select id="admin-emp-select" onchange="renderAdminEmployeeDetail()"></select>
+          </div>
+        </div>
+        <div class="stats-row" id="admin-emp-stats"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th id="th-date2">Date</th><th id="th-day2">Day</th>
+                <th id="th-start2">Start</th><th id="th-end2">End</th>
+                <th id="th-duration2">Duration</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="admin-emp-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ADMIN SUMMARY ── -->
+    <div id="view-admin-summary" style="display:none;">
+      <div class="card">
+        <div class="summary-header">
+          <div class="card-title" id="lbl-adminsum">Monthly Summary — All Employees</div>
+          <div class="export-btns">
+            <select id="admin-export-month" style="padding:8px 12px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);font-family:var(--font);font-size:14px;color:var(--text);background:var(--white);outline:none;"></select>
+            <button class="btn btn-outline btn-sm" onclick="exportAdminPDF()" id="btn-adminpdf">PDF</button>
+            <button class="btn btn-outline btn-sm" onclick="exportAdminExcel()" id="btn-adminexcel">Excel</button>
+          </div>
+        </div>
+        <div id="admin-summary-content"></div>
+      </div>
+    </div>
+
+    <!-- ── ADMIN MANAGE USERS ── -->
+    <div id="view-admin-manage" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" id="lbl-manageusers">Manage Users</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th id="th-name">Name</th><th id="th-email">Email</th>
+                <th id="th-role">Role</th><th id="th-joined">Joined</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="admin-users-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── EDIT MODAL ── -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-title" id="edit-modal-title">Edit Entry</div>
+    <input type="hidden" id="edit-entry-id">
+    <input type="hidden" id="edit-entry-uid">
+    <div class="form-group">
+      <label id="edit-lbl-date">Date</label>
+      <input type="date" id="edit-date">
+    </div>
+    <div class="form-group">
+      <label id="edit-lbl-start">Start time</label>
+      <input type="time" id="edit-start">
+    </div>
+    <div class="form-group">
+      <label id="edit-lbl-end">End time</label>
+      <input type="time" id="edit-end">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeModal()" id="btn-cancel">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEdit()" id="btn-save">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── DELETE CONFIRM MODAL ── -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal">
+    <div class="modal-title" id="delete-modal-title">Delete entry?</div>
+    <p style="font-size:14px;color:var(--text-muted);" id="delete-modal-text">This action cannot be undone.</p>
+    <input type="hidden" id="delete-entry-id">
+    <input type="hidden" id="delete-entry-uid">
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeModal()" id="btn-cancel2">Cancel</button>
+      <button class="btn btn-danger btn-sm" onclick="confirmDelete()" id="btn-delete">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// STATE & STORAGE
+// ══════════════════════════════════════════════════════
+
+let lang = 'en';
+let currentUser = null;
+let activeTab = '';
+let adminSelectedMonth = '';
+let mySelectedMonth = '';
+
+const DB_USERS = 'hoh_users';
+const DB_ENTRIES = 'hoh_entries';
+const ADMIN_EMAIL = 'admin@houseofhabits.nl';
+
+function loadUsers() { return JSON.parse(localStorage.getItem(DB_USERS) || '[]'); }
+function saveUsers(u) { localStorage.setItem(DB_USERS, JSON.stringify(u)); }
+function loadEntries() { return JSON.parse(localStorage.getItem(DB_ENTRIES) || '[]'); }
+function saveEntries(e) { localStorage.setItem(DB_ENTRIES, JSON.stringify(e)); }
+
+// Seed admin account if not exists
+function seedAdmin() {
+  const users = loadUsers();
+  if (!users.find(u => u.email === ADMIN_EMAIL)) {
+    users.push({ id: 'admin', name: 'Admin', email: ADMIN_EMAIL, password: 'admin123', role: 'admin', joined: today() });
+    saveUsers(users);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// I18N
+// ══════════════════════════════════════════════════════
+
+const T = {
+  en: {
+    authSubtitle: 'Employee Time Tracking',
+    lblEmail: 'Email address', lblPassword: 'Password',
+    lblEmail2: 'Email address', lblPassword2: 'Password',
+    lblName: 'Full name', lblRole: 'Role',
+    btnLogin: 'Sign in', btnRegister: 'Create account',
+    btnSignout: 'Sign out',
+    linkToRegister: "Don't have an account? Sign up",
+    linkToLogin: 'Already have an account? Sign in',
+    tabMytime: 'My Timesheet', tabMysummary: 'Monthly Summary',
+    tabOverview: 'Overview', tabEmpDetail: 'Employee Detail',
+    tabAdminSum: 'Monthly Summary', tabManage: 'Manage Users',
+    lblAddEntry: 'Add Entry', lblDate: 'Date',
+    lblStart: 'Start time', lblEnd: 'End time',
+    btnAdd: 'Add', lblEntries: 'Time entries',
+    thDate: 'Date', thDay: 'Day', thStart: 'Start', thEnd: 'End', thDuration: 'Duration',
+    lblAllEmployees: 'All Employees', lblEmpDetail: 'Employee Detail',
+    lblSelectEmp: 'Employee:', lblAdminSum: 'Monthly Summary — All Employees',
+    lblManageUsers: 'Manage Users',
+    thName: 'Name', thEmail: 'Email', thRole: 'Role', thJoined: 'Joined',
+    lblMySummary: 'My Monthly Summary',
+    statTotalHours: 'Total hours', statDaysWorked: 'Days worked',
+    statAvgDay: 'Avg per day', statThisMonth: 'This month',
+    editModalTitle: 'Edit Entry', deleteModalTitle: 'Delete entry?',
+    deleteModalText: 'This action cannot be undone.',
+    btnCancel: 'Cancel', btnSave: 'Save changes', btnDelete: 'Delete',
+    btnPdf: 'PDF', btnExcel: 'Excel',
+    toastAdded: 'Entry added!', toastSaved: 'Changes saved!', toastDeleted: 'Entry deleted.',
+    emptyEntries: 'No entries yet for this month.',
+    emptyEntriesSub: 'Add your first entry above.',
+    noEntrySelected: 'Select an employee to view detail.',
+    roles: { trainer: 'Trainer', frontdesk: 'Front Desk', admin: 'Admin' },
+    days: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+    months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+    monthShort: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    totalHoursLabel: 'Total hours worked',
+    pdfTitle: 'Timesheet',
+    allMonths: 'All months',
+    errEmail: 'Please enter a valid email.',
+    errPass: 'Password must be at least 6 characters.',
+    errName: 'Please enter your name.',
+    errExists: 'An account with this email already exists.',
+    errNotFound: 'No account found with this email.',
+    errWrongPass: 'Incorrect password.',
+    errDates: 'End time must be after start time.',
+    errDuplicate: 'An entry already exists for this date.',
+  },
+  nl: {
+    authSubtitle: 'Urenregistratie medewerkers',
+    lblEmail: 'E-mailadres', lblPassword: 'Wachtwoord',
+    lblEmail2: 'E-mailadres', lblPassword2: 'Wachtwoord',
+    lblName: 'Volledige naam', lblRole: 'Functie',
+    btnLogin: 'Inloggen', btnRegister: 'Account aanmaken',
+    btnSignout: 'Uitloggen',
+    linkToRegister: 'Nog geen account? Registreer',
+    linkToLogin: 'Al een account? Inloggen',
+    tabMytime: 'Mijn Uren', tabMysummary: 'Maandoverzicht',
+    tabOverview: 'Overzicht', tabEmpDetail: 'Medewerker Detail',
+    tabAdminSum: 'Maandoverzicht', tabManage: 'Gebruikers beheren',
+    lblAddEntry: 'Invoer toevoegen', lblDate: 'Datum',
+    lblStart: 'Begintijd', lblEnd: 'Eindtijd',
+    btnAdd: 'Toevoegen', lblEntries: 'Uren invoer',
+    thDate: 'Datum', thDay: 'Dag', thStart: 'Begin', thEnd: 'Einde', thDuration: 'Duur',
+    lblAllEmployees: 'Alle Medewerkers', lblEmpDetail: 'Medewerker Detail',
+    lblSelectEmp: 'Medewerker:', lblAdminSum: 'Maandoverzicht — Alle Medewerkers',
+    lblManageUsers: 'Gebruikers beheren',
+    thName: 'Naam', thEmail: 'E-mail', thRole: 'Functie', thJoined: 'Aangemeld',
+    lblMySummary: 'Mijn Maandoverzicht',
+    statTotalHours: 'Totale uren', statDaysWorked: 'Gewerkte dagen',
+    statAvgDay: 'Gem. per dag', statThisMonth: 'Deze maand',
+    editModalTitle: 'Invoer bewerken', deleteModalTitle: 'Invoer verwijderen?',
+    deleteModalText: 'Deze actie kan niet ongedaan worden gemaakt.',
+    btnCancel: 'Annuleren', btnSave: 'Wijzigingen opslaan', btnDelete: 'Verwijderen',
+    btnPdf: 'PDF', btnExcel: 'Excel',
+    toastAdded: 'Invoer toegevoegd!', toastSaved: 'Wijzigingen opgeslagen!', toastDeleted: 'Invoer verwijderd.',
+    emptyEntries: 'Nog geen invoer voor deze maand.',
+    emptyEntriesSub: 'Voeg hierboven je eerste invoer toe.',
+    noEntrySelected: 'Selecteer een medewerker voor details.',
+    roles: { trainer: 'Trainer', frontdesk: 'Balie', admin: 'Beheerder' },
+    days: ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'],
+    months: ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'],
+    monthShort: ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'],
+    totalHoursLabel: 'Totaal gewerkte uren',
+    pdfTitle: 'Urenstaat',
+    allMonths: 'Alle maanden',
+    errEmail: 'Voer een geldig e-mailadres in.',
+    errPass: 'Wachtwoord moet minimaal 6 tekens zijn.',
+    errName: 'Voer uw naam in.',
+    errExists: 'Er bestaat al een account met dit e-mailadres.',
+    errNotFound: 'Geen account gevonden met dit e-mailadres.',
+    errWrongPass: 'Onjuist wachtwoord.',
+    errDates: 'Eindtijd moet na begintijd zijn.',
+    errDuplicate: 'Er bestaat al een invoer voor deze datum.',
+  }
+};
+
+function t(key) { return T[lang][key] || key; }
+
+function setLang(l) {
+  lang = l;
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase() === l);
+  });
+  applyTranslations();
+  if (currentUser) renderCurrentView();
+}
+
+function applyTranslations() {
+  const s = el => el ? el : { textContent: '' };
+  s(document.getElementById('auth-subtitle')).textContent = t('authSubtitle');
+  s(document.getElementById('lbl-email')).textContent = t('lblEmail');
+  s(document.getElementById('lbl-password')).textContent = t('lblPassword');
+  s(document.getElementById('lbl-email2')).textContent = t('lblEmail2');
+  s(document.getElementById('lbl-password2')).textContent = t('lblPassword2');
+  s(document.getElementById('lbl-name')).textContent = t('lblName');
+  s(document.getElementById('lbl-role')).textContent = t('lblRole');
+  s(document.getElementById('btn-login')).textContent = t('btnLogin');
+  s(document.getElementById('btn-register')).textContent = t('btnRegister');
+  s(document.getElementById('btn-signout')).textContent = t('btnSignout');
+  s(document.getElementById('link-to-register')).textContent = t('linkToRegister');
+  s(document.getElementById('link-to-login')).textContent = t('linkToLogin');
+  s(document.getElementById('tab-mytime')).textContent = t('tabMytime');
+  s(document.getElementById('tab-mysummary')).textContent = t('tabMysummary');
+  s(document.getElementById('tab-overview')).textContent = t('tabOverview');
+  s(document.getElementById('tab-empdetail')).textContent = t('tabEmpDetail');
+  s(document.getElementById('tab-adminsum')).textContent = t('tabAdminSum');
+  s(document.getElementById('tab-manage')).textContent = t('tabManage');
+  s(document.getElementById('lbl-addentry')).textContent = t('lblAddEntry');
+  s(document.getElementById('lbl-date')).textContent = t('lblDate');
+  s(document.getElementById('lbl-start')).textContent = t('lblStart');
+  s(document.getElementById('lbl-end')).textContent = t('lblEnd');
+  s(document.getElementById('btn-addentry')).textContent = t('btnAdd');
+  s(document.getElementById('lbl-entries')).textContent = t('lblEntries');
+  s(document.getElementById('th-date')).textContent = t('thDate');
+  s(document.getElementById('th-day')).textContent = t('thDay');
+  s(document.getElementById('th-start')).textContent = t('thStart');
+  s(document.getElementById('th-end')).textContent = t('thEnd');
+  s(document.getElementById('th-duration')).textContent = t('thDuration');
+  s(document.getElementById('th-date2')).textContent = t('thDate');
+  s(document.getElementById('th-day2')).textContent = t('thDay');
+  s(document.getElementById('th-start2')).textContent = t('thStart');
+  s(document.getElementById('th-end2')).textContent = t('thEnd');
+  s(document.getElementById('th-duration2')).textContent = t('thDuration');
+  s(document.getElementById('lbl-allemployees')).textContent = t('lblAllEmployees');
+  s(document.getElementById('lbl-empdetail')).textContent = t('lblEmpDetail');
+  s(document.getElementById('lbl-selectemp')).textContent = t('lblSelectEmp');
+  s(document.getElementById('lbl-adminsum')).textContent = t('lblAdminSum');
+  s(document.getElementById('lbl-manageusers')).textContent = t('lblManageUsers');
+  s(document.getElementById('th-name')).textContent = t('thName');
+  s(document.getElementById('th-email')).textContent = t('thEmail');
+  s(document.getElementById('th-role')).textContent = t('thRole');
+  s(document.getElementById('th-joined')).textContent = t('thJoined');
+  s(document.getElementById('lbl-mysummary')).textContent = t('lblMySummary');
+  s(document.getElementById('edit-modal-title')).textContent = t('editModalTitle');
+  s(document.getElementById('edit-lbl-date')).textContent = t('lblDate');
+  s(document.getElementById('edit-lbl-start')).textContent = t('lblStart');
+  s(document.getElementById('edit-lbl-end')).textContent = t('lblEnd');
+  s(document.getElementById('delete-modal-title')).textContent = t('deleteModalTitle');
+  s(document.getElementById('delete-modal-text')).textContent = t('deleteModalText');
+  s(document.getElementById('btn-cancel')).textContent = t('btnCancel');
+  s(document.getElementById('btn-cancel2')).textContent = t('btnCancel');
+  s(document.getElementById('btn-save')).textContent = t('btnSave');
+  s(document.getElementById('btn-delete')).textContent = t('btnDelete');
+  s(document.getElementById('btn-mypdf')).textContent = t('btnPdf');
+  s(document.getElementById('btn-myexcel')).textContent = t('btnExcel');
+  s(document.getElementById('btn-adminpdf')).textContent = t('btnPdf');
+  s(document.getElementById('btn-adminexcel')).textContent = t('btnExcel');
+}
+
+// ══════════════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════════════
+
+function today() { return new Date().toISOString().split('T')[0]; }
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function parseTime(s) {
+  if (!s) return 0;
+  const [h, m] = s.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minutesToHHMM(min) {
+  if (min < 0) min = 0;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${h}:${String(m).padStart(2, '0')}`;
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = t('days')[d.getDay()];
+  return { date: dateStr, day };
+}
+
+function getMonthKey(dateStr) { return dateStr.slice(0, 7); }
+
+function monthLabel(key) {
+  const [y, m] = key.split('-');
+  return `${t('months')[parseInt(m) - 1]} ${y}`;
+}
+
+function getMonthsForUser(uid) {
+  const entries = loadEntries().filter(e => e.userId === uid);
+  const keys = [...new Set(entries.map(e => getMonthKey(e.date)))].sort().reverse();
+  return keys;
+}
+
+function getAllMonths() {
+  const entries = loadEntries();
+  const keys = [...new Set(entries.map(e => getMonthKey(e.date)))].sort().reverse();
+  return keys;
+}
+
+function calcStats(entries) {
+  const totalMin = entries.reduce((s, e) => s + e.duration, 0);
+  const days = entries.length;
+  const avg = days > 0 ? Math.round(totalMin / days) : 0;
+  return { totalMin, days, avg };
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ══════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════
+
+function showForm(f) {
+  document.getElementById('form-login').style.display = f === 'login' ? '' : 'none';
+  document.getElementById('form-register').style.display = f === 'register' ? '' : 'none';
+}
+
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const pass = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+
+  if (!email.includes('@')) { errEl.textContent = t('errEmail'); errEl.style.display = ''; return; }
+  const users = loadUsers();
+  const user = users.find(u => u.email === email);
+  if (!user) { errEl.textContent = t('errNotFound'); errEl.style.display = ''; return; }
+  if (user.password !== pass) { errEl.textContent = t('errWrongPass'); errEl.style.display = ''; return; }
+
+  currentUser = user;
+  localStorage.setItem('hoh_session', JSON.stringify(user));
+  enterApp();
+}
+
+function doRegister() {
+  const name = document.getElementById('reg-name').value.trim();
+  const role = document.getElementById('reg-role').value;
+  const email = document.getElementById('reg-email').value.trim().toLowerCase();
+  const pass = document.getElementById('reg-password').value;
+  const errEl = document.getElementById('reg-error');
+  errEl.style.display = 'none';
+
+  if (!name) { errEl.textContent = t('errName'); errEl.style.display = ''; return; }
+  if (!email.includes('@')) { errEl.textContent = t('errEmail'); errEl.style.display = ''; return; }
+  if (pass.length < 6) { errEl.textContent = t('errPass'); errEl.style.display = ''; return; }
+
+  const users = loadUsers();
+  if (users.find(u => u.email === email)) { errEl.textContent = t('errExists'); errEl.style.display = ''; return; }
+
+  const user = { id: uid(), name, email, password: pass, role, joined: today() };
+  users.push(user);
+  saveUsers(users);
+  currentUser = user;
+  localStorage.setItem('hoh_session', JSON.stringify(user));
+  enterApp();
+}
+
+function doLogout() {
+  currentUser = null;
+  localStorage.removeItem('hoh_session');
+  document.getElementById('page-app').classList.remove('active');
+  document.getElementById('page-auth').classList.add('active');
+}
+
+function enterApp() {
+  document.getElementById('page-auth').classList.remove('active');
+  document.getElementById('page-app').classList.add('active');
+  document.getElementById('topbar-username').textContent = currentUser.name;
+
+  const isAdmin = currentUser.role === 'admin';
+  document.getElementById('employee-tabs').style.display = isAdmin ? 'none' : '';
+  document.getElementById('admin-tabs').style.display = isAdmin ? '' : 'none';
+
+  // Set today's date
+  document.getElementById('entry-date').value = today();
+
+  // Init selected months
+  const months = isAdmin ? getAllMonths() : getMonthsForUser(currentUser.id);
+  const current = today().slice(0, 7);
+  mySelectedMonth = months.includes(current) ? current : (months[0] || current);
+  adminSelectedMonth = months.includes(current) ? current : (months[0] || current);
+
+  applyTranslations();
+  if (isAdmin) showTab('admin-overview');
+  else showTab('my-time');
+}
+
+// ══════════════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════════════
+
+function showTab(tab) {
+  activeTab = tab;
+  const views = ['my-time','my-summary','admin-overview','admin-employee','admin-summary','admin-manage'];
+  views.forEach(v => { const el = document.getElementById('view-' + v); if(el) el.style.display = 'none'; });
+
+  const tabMap = {
+    'my-time': 'tab-mytime', 'my-summary': 'tab-mysummary',
+    'admin-overview': 'tab-overview', 'admin-employee': 'tab-empdetail',
+    'admin-summary': 'tab-adminsum', 'admin-manage': 'tab-manage'
+  };
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.getElementById(tabMap[tab]);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  const view = document.getElementById('view-' + tab);
+  if (view) view.style.display = '';
+  renderCurrentView();
+}
+
+function renderCurrentView() {
+  if (activeTab === 'my-time') renderMyTime();
+  else if (activeTab === 'my-summary') renderMySummary();
+  else if (activeTab === 'admin-overview') renderAdminOverview();
+  else if (activeTab === 'admin-employee') renderAdminEmployeeDetail();
+  else if (activeTab === 'admin-summary') renderAdminSummary();
+  else if (activeTab === 'admin-manage') renderAdminManage();
+}
+
+// ══════════════════════════════════════════════════════
+// ENTRY CRUD
+// ══════════════════════════════════════════════════════
+
+function addEntry() {
+  const date = document.getElementById('entry-date').value;
+  const start = document.getElementById('entry-start').value;
+  const end = document.getElementById('entry-end').value;
+
+  if (!date || !start || !end) { showToast('Fill in all fields.'); return; }
+  const startMin = parseTime(start), endMin = parseTime(end);
+  if (endMin <= startMin) { showToast(t('errDates')); return; }
+
+  const entries = loadEntries();
+  if (entries.find(e => e.userId === currentUser.id && e.date === date)) {
+    showToast(t('errDuplicate')); return;
+  }
+
+  entries.push({ id: uid(), userId: currentUser.id, date, start, end, duration: endMin - startMin });
+  saveEntries(entries);
+  document.getElementById('entry-start').value = '';
+  document.getElementById('entry-end').value = '';
+  mySelectedMonth = getMonthKey(date);
+  showToast(t('toastAdded'));
+  renderMyTime();
+}
+
+function openEdit(entryId, userId) {
+  const entries = loadEntries();
+  const entry = entries.find(e => e.id === entryId);
+  if (!entry) return;
+  document.getElementById('edit-entry-id').value = entryId;
+  document.getElementById('edit-entry-uid').value = userId || currentUser.id;
+  document.getElementById('edit-date').value = entry.date;
+  document.getElementById('edit-start').value = entry.start;
+  document.getElementById('edit-end').value = entry.end;
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function saveEdit() {
+  const id = document.getElementById('edit-entry-id').value;
+  const date = document.getElementById('edit-date').value;
+  const start = document.getElementById('edit-start').value;
+  const end = document.getElementById('edit-end').value;
+  const startMin = parseTime(start), endMin = parseTime(end);
+  if (endMin <= startMin) { showToast(t('errDates')); return; }
+  const entries = loadEntries();
+  const idx = entries.findIndex(e => e.id === id);
+  if (idx >= 0) {
+    entries[idx] = { ...entries[idx], date, start, end, duration: endMin - startMin };
+    saveEntries(entries);
+  }
+  closeModal();
+  showToast(t('toastSaved'));
+  mySelectedMonth = getMonthKey(date);
+  renderCurrentView();
+}
+
+function openDelete(entryId) {
+  document.getElementById('delete-entry-id').value = entryId;
+  document.getElementById('delete-modal').classList.add('open');
+}
+
+function confirmDelete() {
+  const id = document.getElementById('delete-entry-id').value;
+  const entries = loadEntries().filter(e => e.id !== id);
+  saveEntries(entries);
+  closeModal();
+  showToast(t('toastDeleted'));
+  renderCurrentView();
+}
+
+function closeModal() {
+  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+}
+
+// ══════════════════════════════════════════════════════
+// MY TIME VIEW
+// ══════════════════════════════════════════════════════
+
+function renderMyTime() {
+  const allEntries = loadEntries().filter(e => e.userId === currentUser.id);
+  const months = [...new Set(allEntries.map(e => getMonthKey(e.date)))].sort().reverse();
+  const cur = today().slice(0, 7);
+  if (!mySelectedMonth) mySelectedMonth = months.includes(cur) ? cur : (months[0] || cur);
+
+  // Month nav
+  const nav = document.getElementById('my-month-nav');
+  const allMonthKeys = months.length ? months : [cur];
+  nav.innerHTML = allMonthKeys.map(mk =>
+    `<button class="month-chip ${mk === mySelectedMonth ? 'active' : ''}" onclick="mySelectedMonth='${mk}';renderMyTime();">${monthLabel(mk)}</button>`
+  ).join('');
+
+  const entries = allEntries.filter(e => getMonthKey(e.date) === mySelectedMonth)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const stats = calcStats(entries);
+
+  // Stats
+  document.getElementById('my-stats-row').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">${t('statTotalHours')}</div>
+      <div class="stat-value">${minutesToHHMM(stats.totalMin)}</div>
+      <div class="stat-sub">${monthLabel(mySelectedMonth)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">${t('statDaysWorked')}</div>
+      <div class="stat-value">${stats.days}</div>
+      <div class="stat-sub">${t('statThisMonth')}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">${t('statAvgDay')}</div>
+      <div class="stat-value">${minutesToHHMM(stats.avg)}</div>
+      <div class="stat-sub">${t('statDaysWorked').toLowerCase()}</div>
+    </div>
+  `;
+
+  document.getElementById('my-month-label').textContent = monthLabel(mySelectedMonth);
+
+  // Table
+  const tbody = document.getElementById('my-entries-body');
+  if (!entries.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty">
+      <div class="empty-icon">📋</div>
+      <h3>${t('emptyEntries')}</h3>
+      <p>${t('emptyEntriesSub')}</p>
+    </div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = entries.map(e => {
+    const { day } = formatDate(e.date);
+    return `<tr>
+      <td>${e.date}</td>
+      <td class="td-day">${day}</td>
+      <td class="td-mono">${e.start}</td>
+      <td class="td-mono">${e.end}</td>
+      <td class="td-mono td-duration">${minutesToHHMM(e.duration)}</td>
+      <td>
+        <div class="td-actions">
+          <button class="btn btn-outline btn-sm btn-icon" onclick="openEdit('${e.id}')" title="Edit">✏️</button>
+          <button class="btn btn-outline btn-sm btn-icon" onclick="openDelete('${e.id}')" title="Delete">🗑️</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// MY SUMMARY VIEW
+// ══════════════════════════════════════════════════════
+
+function renderMySummary() {
+  const allEntries = loadEntries().filter(e => e.userId === currentUser.id);
+  const months = [...new Set(allEntries.map(e => getMonthKey(e.date)))].sort().reverse();
+
+  const sel = document.getElementById('my-export-month');
+  const cur = sel.value || (months[0] || today().slice(0, 7));
+  sel.innerHTML = months.map(m => `<option value="${m}" ${m===cur?'selected':''}>${monthLabel(m)}</option>`).join('');
+
+  const selectedMk = sel.value || cur;
+  const entries = allEntries.filter(e => getMonthKey(e.date) === selectedMk).sort((a,b) => a.date.localeCompare(b.date));
+  const stats = calcStats(entries);
+
+  document.getElementById('my-summary-sub').textContent = `${currentUser.name} — ${monthLabel(selectedMk)}`;
+
+  document.getElementById('my-summary-content').innerHTML = buildSummaryHTML(entries, stats);
+}
+
+function buildSummaryHTML(entries, stats) {
+  if (!entries.length) return `<div class="empty"><div class="empty-icon">📋</div><h3>${t('emptyEntries')}</h3></div>`;
+  return `
+    <div class="stats-row" style="margin-bottom:1.25rem;">
+      <div class="stat-card"><div class="stat-label">${t('statTotalHours')}</div><div class="stat-value">${minutesToHHMM(stats.totalMin)}</div></div>
+      <div class="stat-card"><div class="stat-label">${t('statDaysWorked')}</div><div class="stat-value">${stats.days}</div></div>
+      <div class="stat-card"><div class="stat-label">${t('statAvgDay')}</div><div class="stat-value">${minutesToHHMM(stats.avg)}</div></div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>${t('thDate')}</th><th>${t('thDay')}</th><th>${t('thStart')}</th><th>${t('thEnd')}</th><th>${t('thDuration')}</th></tr></thead>
+      <tbody>${entries.map(e => {
+        const {day} = formatDate(e.date);
+        return `<tr><td>${e.date}</td><td class="td-day">${day}</td><td class="td-mono">${e.start}</td><td class="td-mono">${e.end}</td><td class="td-mono td-duration">${minutesToHHMM(e.duration)}</td></tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    <div style="margin-top:1rem;padding:1rem;background:var(--green-pale);border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:600;color:var(--green);">${t('totalHoursLabel')}</span>
+      <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green);">${minutesToHHMM(stats.totalMin)}</span>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// ADMIN OVERVIEW
+// ══════════════════════════════════════════════════════
+
+function renderAdminOverview() {
+  const users = loadUsers().filter(u => u.role !== 'admin');
+  const allEntries = loadEntries();
+  const months = getAllMonths();
+  const cur = today().slice(0, 7);
+  if (!adminSelectedMonth) adminSelectedMonth = months.includes(cur) ? cur : (months[0] || cur);
+
+  // Month nav
+  const nav = document.getElementById('admin-month-nav');
+  const allMk = months.length ? months : [cur];
+  nav.innerHTML = allMk.map(mk =>
+    `<button class="month-chip ${mk === adminSelectedMonth ? 'active' : ''}" onclick="adminSelectedMonth='${mk}';renderAdminOverview();">${monthLabel(mk)}</button>`
+  ).join('');
+
+  const monthEntries = allEntries.filter(e => getMonthKey(e.date) === adminSelectedMonth);
+  const totalMin = monthEntries.reduce((s, e) => s + e.duration, 0);
+  const activeEmps = new Set(monthEntries.map(e => e.userId)).size;
+
+  document.getElementById('admin-global-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">${t('statTotalHours')}</div><div class="stat-value">${minutesToHHMM(totalMin)}</div><div class="stat-sub">${monthLabel(adminSelectedMonth)}</div></div>
+    <div class="stat-card"><div class="stat-label">${t('statDaysWorked')}</div><div class="stat-value">${monthEntries.length}</div><div class="stat-sub">${monthLabel(adminSelectedMonth)}</div></div>
+    <div class="stat-card"><div class="stat-label">Active employees</div><div class="stat-value">${activeEmps}</div><div class="stat-sub">${t('statThisMonth')}</div></div>
+    <div class="stat-card"><div class="stat-label">Total employees</div><div class="stat-value">${users.length}</div></div>
+  `;
+
+  const grid = document.getElementById('admin-emp-grid');
+  grid.innerHTML = users.map(u => {
+    const empEntries = monthEntries.filter(e => e.userId === u.id);
+    const stats = calcStats(empEntries);
+    const initials = u.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase();
+    return `<div class="emp-card" onclick="selectEmpDetail('${u.id}')">
+      <div class="emp-avatar">${initials}</div>
+      <div class="emp-name">${u.name}</div>
+      <div class="emp-role">${t('roles')[u.role] || u.role}</div>
+      <div class="emp-hours">⏱ ${minutesToHHMM(stats.totalMin)} · ${stats.days} ${t('statDaysWorked').toLowerCase()}</div>
+    </div>`;
+  }).join('');
+
+  if (!users.length) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="empty-icon">👥</div><h3>No employees yet.</h3><p>Employees will appear here after signing up.</p></div>`;
+  }
+}
+
+function selectEmpDetail(userId) {
+  const sel = document.getElementById('admin-emp-select');
+  if (sel) sel.value = userId;
+  showTab('admin-employee');
+}
+
+// ══════════════════════════════════════════════════════
+// ADMIN EMPLOYEE DETAIL
+// ══════════════════════════════════════════════════════
+
+function renderAdminEmployeeDetail() {
+  const users = loadUsers().filter(u => u.role !== 'admin');
+  const sel = document.getElementById('admin-emp-select');
+  sel.innerHTML = users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+  if (!sel.value && users.length) sel.value = users[0].id;
+
+  const userId = sel.value;
+  if (!userId) { document.getElementById('admin-emp-body').innerHTML = `<tr><td colspan="6"><div class="empty"><h3>${t('noEntrySelected')}</h3></div></td></tr>`; return; }
+
+  const entries = loadEntries().filter(e => e.userId === userId).sort((a,b) => a.date.localeCompare(b.date));
+  const stats = calcStats(entries);
+
+  document.getElementById('admin-emp-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">${t('statTotalHours')}</div><div class="stat-value">${minutesToHHMM(stats.totalMin)}</div><div class="stat-sub">All time</div></div>
+    <div class="stat-card"><div class="stat-label">${t('statDaysWorked')}</div><div class="stat-value">${stats.days}</div></div>
+    <div class="stat-card"><div class="stat-label">${t('statAvgDay')}</div><div class="stat-value">${minutesToHHMM(stats.avg)}</div></div>
+  `;
+
+  const tbody = document.getElementById('admin-emp-body');
+  if (!entries.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div><h3>${t('emptyEntries')}</h3></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = entries.map(e => {
+    const {day} = formatDate(e.date);
+    return `<tr>
+      <td>${e.date}</td><td class="td-day">${day}</td>
+      <td class="td-mono">${e.start}</td><td class="td-mono">${e.end}</td>
+      <td class="td-mono td-duration">${minutesToHHMM(e.duration)}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-outline btn-sm btn-icon" onclick="openEdit('${e.id}','${userId}')">✏️</button>
+        <button class="btn btn-outline btn-sm btn-icon" onclick="openDelete('${e.id}')">🗑️</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// ADMIN SUMMARY
+// ══════════════════════════════════════════════════════
+
+function renderAdminSummary() {
+  const months = getAllMonths();
+  const sel = document.getElementById('admin-export-month');
+  const cur = sel.value || (months[0] || today().slice(0, 7));
+  sel.innerHTML = months.map(m => `<option value="${m}" ${m===cur?'selected':''}>${monthLabel(m)}</option>`).join('');
+
+  const selectedMk = sel.value || cur;
+  const users = loadUsers().filter(u => u.role !== 'admin');
+  const allEntries = loadEntries().filter(e => getMonthKey(e.date) === selectedMk);
+
+  const rows = users.map(u => {
+    const entries = allEntries.filter(e => e.userId === u.id).sort((a,b) => a.date.localeCompare(b.date));
+    const stats = calcStats(entries);
+    return { user: u, entries, stats };
+  });
+
+  const content = document.getElementById('admin-summary-content');
+  if (!rows.some(r => r.entries.length)) {
+    content.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>${t('emptyEntries')}</h3></div>`;
+    return;
+  }
+
+  content.innerHTML = rows.filter(r => r.entries.length).map(r => `
+    <div style="margin-bottom:1.5rem;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div class="emp-avatar" style="width:32px;height:32px;font-size:12px;">${r.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</div>
+        <div>
+          <div style="font-weight:600;">${r.user.name}</div>
+          <div style="font-size:12px;color:var(--text-muted);">${t('roles')[r.user.role] || r.user.role}</div>
+        </div>
+        <div style="margin-left:auto;font-family:var(--mono);font-weight:600;color:var(--green);">${minutesToHHMM(r.stats.totalMin)} · ${r.stats.days} days</div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>${t('thDate')}</th><th>${t('thDay')}</th><th>${t('thStart')}</th><th>${t('thEnd')}</th><th>${t('thDuration')}</th></tr></thead>
+        <tbody>${r.entries.map(e => {
+          const {day} = formatDate(e.date);
+          return `<tr><td>${e.date}</td><td class="td-day">${day}</td><td class="td-mono">${e.start}</td><td class="td-mono">${e.end}</td><td class="td-mono td-duration">${minutesToHHMM(e.duration)}</td></tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border);margin-bottom:1.5rem;">
+  `).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// ADMIN MANAGE USERS
+// ══════════════════════════════════════════════════════
+
+function renderAdminManage() {
+  const users = loadUsers().filter(u => u.role !== 'admin');
+  const tbody = document.getElementById('admin-users-body');
+  if (!users.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="empty-icon">👥</div><h3>No users yet.</h3></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = users.map(u => `<tr>
+    <td><strong>${u.name}</strong></td>
+    <td style="color:var(--text-muted);font-size:13px;">${u.email}</td>
+    <td><span class="badge badge-green">${t('roles')[u.role] || u.role}</span></td>
+    <td style="color:var(--text-muted);font-size:13px;">${u.joined}</td>
+    <td><button class="btn btn-outline btn-sm" onclick="deleteUser('${u.id}')">Remove</button></td>
+  </tr>`).join('');
+}
+
+function deleteUser(userId) {
+  if (!confirm('Remove this user and all their entries?')) return;
+  const users = loadUsers().filter(u => u.id !== userId);
+  saveUsers(users);
+  const entries = loadEntries().filter(e => e.userId !== userId);
+  saveEntries(entries);
+  renderAdminManage();
+}
+
+// ══════════════════════════════════════════════════════
+// EXPORT — PDF
+// ══════════════════════════════════════════════════════
+
+function exportMyPDF() {
+  const selectedMk = document.getElementById('my-export-month').value || today().slice(0,7);
+  const entries = loadEntries().filter(e => e.userId === currentUser.id && getMonthKey(e.date) === selectedMk)
+    .sort((a,b) => a.date.localeCompare(b.date));
+  const stats = calcStats(entries);
+  generatePDF([{ user: currentUser, entries, stats }], monthLabel(selectedMk));
+}
+
+function exportAdminPDF() {
+  const selectedMk = document.getElementById('admin-export-month').value || today().slice(0,7);
+  const users = loadUsers().filter(u => u.role !== 'admin');
+  const allEntries = loadEntries().filter(e => getMonthKey(e.date) === selectedMk);
+  const rows = users.map(u => {
+    const entries = allEntries.filter(e => e.userId === u.id).sort((a,b) => a.date.localeCompare(b.date));
+    return { user: u, entries, stats: calcStats(entries) };
+  }).filter(r => r.entries.length);
+  generatePDF(rows, monthLabel(selectedMk));
+}
+
+function generatePDF(rows, monthLabelStr) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pw = 210, ml = 15, mr = 15, cw = pw - ml - mr;
+  let y = 20;
+
+  // Header
+  doc.setFillColor(26, 58, 42);
+  doc.roundedRect(ml, y - 8, cw, 20, 3, 3, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+  doc.text('House of Habits', ml + 8, y + 2);
+  doc.setFontSize(11); doc.setFont('helvetica', 'normal');
+  doc.text(`${t('pdfTitle')} — ${monthLabelStr}`, pw - mr - 8, y + 2, { align: 'right' });
+  y += 20;
+
+  rows.forEach(r => {
+    if (y > 260) { doc.addPage(); y = 20; }
+    doc.setTextColor(26, 58, 42);
+    doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+    doc.text(r.user.name, ml, y + 6);
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 90, 82);
+    doc.text(`${t('roles')[r.user.role] || r.user.role} · ${t('statTotalHours')}: ${minutesToHHMM(r.stats.totalMin)} · ${t('statDaysWorked')}: ${r.stats.days}`, ml, y + 12);
+    y += 18;
+
+    // Table header
+    doc.setFillColor(232, 243, 237);
+    doc.rect(ml, y, cw, 8, 'F');
+    doc.setTextColor(26, 58, 42); doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+    const cols = [t('thDate'), t('thDay'), t('thStart'), t('thEnd'), t('thDuration')];
+    const xs = [ml + 2, ml + 38, ml + 80, ml + 112, ml + 144];
+    cols.forEach((c, i) => doc.text(c, xs[i], y + 5.5));
+    y += 9;
+
+    r.entries.forEach((e, idx) => {
+      if (y > 275) { doc.addPage(); y = 20; }
+      if (idx % 2 === 0) { doc.setFillColor(250, 248, 244); doc.rect(ml, y, cw, 7, 'F'); }
+      const {day} = formatDate(e.date);
+      doc.setTextColor(26, 26, 24); doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+      [e.date, day, e.start, e.end, minutesToHHMM(e.duration)].forEach((v, i) => doc.text(String(v), xs[i], y + 5));
+      y += 7;
+    });
+
+    // Total row
+    doc.setFillColor(26, 58, 42);
+    doc.rect(ml, y, cw, 8, 'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+    doc.text(t('totalHoursLabel'), ml + 2, y + 5.5);
+    doc.text(minutesToHHMM(r.stats.totalMin), xs[4], y + 5.5);
+    y += 16;
+  });
+
+  // Footer
+  doc.setTextColor(150, 150, 140); doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+  doc.text(`Generated: ${new Date().toLocaleDateString()} · House of Habits`, pw / 2, 290, { align: 'center' });
+
+  doc.save(`timesheet-${monthLabelStr.replace(/ /g, '-')}.pdf`);
+}
+
+// ══════════════════════════════════════════════════════
+// EXPORT — EXCEL
+// ══════════════════════════════════════════════════════
+
+function exportMyExcel() {
+  const selectedMk = document.getElementById('my-export-month').value || today().slice(0,7);
+  const entries = loadEntries().filter(e => e.userId === currentUser.id && getMonthKey(e.date) === selectedMk)
+    .sort((a,b) => a.date.localeCompare(b.date));
+  generateExcel([{ user: currentUser, entries, stats: calcStats(entries) }], monthLabel(selectedMk));
+}
+
+function exportAdminExcel() {
+  const selectedMk = document.getElementById('admin-export-month').value || today().slice(0,7);
+  const users = loadUsers().filter(u => u.role !== 'admin');
+  const allEntries = loadEntries().filter(e => getMonthKey(e.date) === selectedMk);
+  const rows = users.map(u => {
+    const entries = allEntries.filter(e => e.userId === u.id).sort((a,b) => a.date.localeCompare(b.date));
+    return { user: u, entries, stats: calcStats(entries) };
+  }).filter(r => r.entries.length);
+  generateExcel(rows, monthLabel(selectedMk));
+}
+
+function generateExcel(rows, monthLabelStr) {
+  const wb = XLSX.utils.book_new();
+
+  rows.forEach(r => {
+    const data = [
+      ['House of Habits — Timesheet'],
+      [`${r.user.name} · ${monthLabelStr}`],
+      [],
+      [t('thDate'), t('thDay'), t('thStart'), t('thEnd'), t('thDuration'), 'Minutes'],
+      ...r.entries.map(e => {
+        const {day} = formatDate(e.date);
+        return [e.date, day, e.start, e.end, minutesToHHMM(e.duration), e.duration];
+      }),
+      [],
+      [t('totalHoursLabel'), '', '', '', minutesToHHMM(r.stats.totalMin), r.stats.totalMin],
+      [t('statDaysWorked'), '', '', '', r.stats.days, ''],
+      [t('statAvgDay'), '', '', '', minutesToHHMM(r.stats.avg), ''],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }];
+    const sheetName = r.user.name.slice(0, 31);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  });
+
+  // Summary sheet for admin
+  if (rows.length > 1) {
+    const summaryData = [
+      ['House of Habits — Summary', monthLabelStr],
+      [],
+      [t('thName'), t('thRole'), t('statDaysWorked'), t('statTotalHours'), 'Minutes'],
+      ...rows.map(r => [r.user.name, t('roles')[r.user.role]||r.user.role, r.stats.days, minutesToHHMM(r.stats.totalMin), r.stats.totalMin]),
+      [],
+      ['TOTAL', '', rows.reduce((s,r)=>s+r.stats.days,0), minutesToHHMM(rows.reduce((s,r)=>s+r.stats.totalMin,0)), rows.reduce((s,r)=>s+r.stats.totalMin,0)]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(summaryData);
+    ws['!cols'] = [{ wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Summary');
+  }
+
+  XLSX.writeFile(wb, `timesheet-${monthLabelStr.replace(/ /g, '-')}.xlsx`);
+}
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+
+window.addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal-overlay')) closeModal();
+});
+
+document.getElementById('entry-date').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('entry-start').focus(); });
+document.getElementById('entry-start').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('entry-end').focus(); });
+document.getElementById('entry-end').addEventListener('keydown', e => { if(e.key==='Enter') addEntry(); });
+document.getElementById('login-password').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('reg-password').addEventListener('keydown', e => { if(e.key==='Enter') doRegister(); });
+
+seedAdmin();
+applyTranslations();
+
+// Resume session
+const session = localStorage.getItem('hoh_session');
+if (session) {
+  try {
+    const u = JSON.parse(session);
+    const users = loadUsers();
+    const fresh = users.find(x => x.id === u.id);
+    if (fresh) { currentUser = fresh; enterApp(); }
+  } catch(e) {}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+node_modules/
+timesheet.db
+timesheet.db-shm
+timesheet.db-wal
+.env
+*.env.local
+.DS_Store
+.claude/
