@@ -1,12 +1,14 @@
 const express = require('express');
-const { DatabaseSync } = require('node:sqlite');
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 
 const app = express();
-const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'timesheet.db');
-const db = new DatabaseSync(DB_PATH);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://localhost/hoh_timesheet',
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+});
 const JWT_SECRET = process.env.JWT_SECRET || 'hoh-timesheet-secret-2026';
 const PORT = process.env.PORT || 3001;
 
@@ -31,64 +33,79 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
 // ── DATABASE SETUP ──────────────────────────────────────
-db.exec('PRAGMA journal_mode = WAL');
-db.exec('PRAGMA foreign_keys = ON');
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'employee',
-    created_at TEXT DEFAULT (date('now'))
-  );
-  CREATE TABLE IF NOT EXISTS entries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    date TEXT NOT NULL,
-    start_time TEXT NOT NULL,
-    end_time TEXT NOT NULL,
-    duration INTEGER NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE(user_id, date)
-  );
-`);
+async function setupDatabase() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'employee',
+      created_at DATE DEFAULT CURRENT_DATE
+    );
+    CREATE TABLE IF NOT EXISTS entries (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      duration INTEGER NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE (user_id, date)
+    );
+  `);
+}
 
 // ── SEED DATA ────────────────────────────────────────────
-function seedDatabase() {
-  const existing = db.prepare('SELECT COUNT(*) as c FROM users').get();
-  if (existing.c > 0) return;
+async function seedDatabase() {
+  const { rows } = await pool.query('SELECT COUNT(*) as c FROM users');
+  if (parseInt(rows[0].c) > 0) return;
 
   console.log('Seeding database with initial data...');
+  const client = await pool.connect();
 
-  const adminHash = bcrypt.hashSync('HoH@Admin2026', 10);
-  db.prepare('INSERT OR IGNORE INTO users (name, email, password, role) VALUES (?, ?, ?, ?)').run('Admin', 'hayajeries10@gmail.com', adminHash, 'admin');
+  try {
+    await client.query('BEGIN');
 
-  const empHash = bcrypt.hashSync('habits2026', 10);
-  const insertUser = db.prepare('INSERT OR IGNORE INTO users (name, email, password, role) VALUES (?, ?, ?, ?)');
-  const insertEntry = db.prepare('INSERT OR IGNORE INTO entries (user_id, date, start_time, end_time, duration) VALUES (?, ?, ?, ?, ?)');
+    const adminHash = bcrypt.hashSync('HoH@Admin2026', 10);
+    await client.query(
+      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING',
+      ['Admin', 'hayajeries10@gmail.com', adminHash, 'admin']
+    );
 
-  const employees = [
-    { name: 'Haya',     email: 'haya@houseofhabits.nl' },
-    { name: 'Caitilin', email: 'caitilin@houseofhabits.nl' },
-    { name: 'Elmira',   email: 'elmira@houseofhabits.nl' },
-    { name: 'Sanne',    email: 'sanne@houseofhabits.nl' },
-    { name: 'Alba',     email: 'alba@houseofhabits.nl' },
-    { name: 'Susana',   email: 'susana@houseofhabits.nl' },
-    { name: 'Arthur',   email: 'arthur@houseofhabits.nl' },
-    { name: 'Dani',     email: 'dani@houseofhabits.nl' },
-  ];
-  employees.forEach(e => insertUser.run(e.name, e.email, empHash, 'employee'));
+    const empHash = bcrypt.hashSync('habits2026', 10);
+    const employees = [
+      { name: 'Haya',     email: 'haya@houseofhabits.nl' },
+      { name: 'Caitilin', email: 'caitilin@houseofhabits.nl' },
+      { name: 'Elmira',   email: 'elmira@houseofhabits.nl' },
+      { name: 'Sanne',    email: 'sanne@houseofhabits.nl' },
+      { name: 'Alba',     email: 'alba@houseofhabits.nl' },
+      { name: 'Susana',   email: 'susana@houseofhabits.nl' },
+      { name: 'Arthur',   email: 'arthur@houseofhabits.nl' },
+      { name: 'Dani',     email: 'dani@houseofhabits.nl' },
+    ];
+    for (const e of employees) {
+      await client.query(
+        'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING',
+        [e.name, e.email, empHash, 'employee']
+      );
+    }
 
-  const getUser = name => db.prepare('SELECT id FROM users WHERE name = ?').get(name);
+    const getUser = async (name) => {
+      const r = await client.query('SELECT id FROM users WHERE name = $1', [name]);
+      return r.rows[0];
+    };
 
-  const seedEntries = () => {
-    db.exec('BEGIN');
+    const insertEntry = async (userId, date, start, end, duration) => {
+      await client.query(
+        'INSERT INTO entries (user_id, date, start_time, end_time, duration) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (user_id, date) DO NOTHING',
+        [userId, date, start, end, duration]
+      );
+    };
+
     // ── HAYA ──
-    const haya = getUser('Haya').id;
-    [
+    const haya = (await getUser('Haya')).id;
+    for (const r of [
       ['2026-02-07','09:00','10:56',116], ['2026-02-10','08:45','12:20',215],
       ['2026-02-11','15:00','17:15',135], ['2026-02-12','07:50','11:40',230],
       ['2026-02-13','07:45','12:30',285], ['2026-02-17','07:45','12:00',255],
@@ -109,11 +126,11 @@ function seedDatabase() {
       ['2026-03-27','07:45','12:30',285], ['2026-03-30','07:45','13:10',325],
       ['2026-03-31','07:45','11:40',235], ['2026-04-01','07:45','11:15',210],
       ['2026-04-02','07:45','12:30',285],
-    ].forEach(r => insertEntry.run(haya, ...r));
+    ]) await insertEntry(haya, ...r);
 
     // ── CAITILIN ──
-    const caitilin = getUser('Caitilin').id;
-    [
+    const caitilin = (await getUser('Caitilin')).id;
+    for (const r of [
       ['2026-02-02','17:45','20:45',180], ['2026-02-04','16:00','20:35',275],
       ['2026-02-05','17:00','21:15',255], ['2026-02-06','07:40','12:40',300],
       ['2026-02-10','16:45','21:10',265], ['2026-02-11','15:00','20:30',330],
@@ -134,11 +151,11 @@ function seedDatabase() {
       ['2026-04-12','07:45','11:35',230], ['2026-04-14','16:30','20:56',266],
       ['2026-04-16','16:30','21:15',285], ['2026-04-17','16:30','19:10',160],
       ['2026-04-21','16:30','20:50',260],
-    ].forEach(r => insertEntry.run(caitilin, ...r));
+    ]) await insertEntry(caitilin, ...r);
 
     // ── ELMIRA ──
-    const elmira = getUser('Elmira').id;
-    [
+    const elmira = (await getUser('Elmira')).id;
+    for (const r of [
       ['2026-02-22','07:45','12:00',255], ['2026-02-23','16:30','21:00',270],
       ['2026-02-27','16:30','19:30',180], ['2026-03-01','07:45','11:30',225],
       ['2026-03-02','16:30','20:30',240], ['2026-03-06','16:30','19:30',180],
@@ -151,20 +168,20 @@ function seedDatabase() {
       ['2026-04-13','16:30','20:45',255], ['2026-04-15','16:30','21:00',270],
       ['2026-04-19','07:45','12:00',255], ['2026-04-20','16:30','20:00',210],
       ['2026-04-22','16:30','20:30',240],
-    ].forEach(r => insertEntry.run(elmira, ...r));
+    ]) await insertEntry(elmira, ...r);
 
     // ── SANNE ──
-    const sanne = getUser('Sanne').id;
-    [
+    const sanne = (await getUser('Sanne')).id;
+    for (const r of [
       ['2026-02-21','08:30','12:30',240], ['2026-02-28','08:30','12:30',240],
       ['2026-03-21','08:30','12:30',240], ['2026-03-28','08:30','12:30',240],
       ['2026-04-11','08:30','12:30',240], ['2026-04-18','08:30','12:30',240],
       ['2026-05-02','08:30','12:30',240],
-    ].forEach(r => insertEntry.run(sanne, ...r));
+    ]) await insertEntry(sanne, ...r);
 
     // ── ALBA ──
-    const alba = getUser('Alba').id;
-    [
+    const alba = (await getUser('Alba')).id;
+    for (const r of [
       ['2026-02-21','09:00','12:00',180], ['2026-02-22','09:00','11:00',120],
       ['2026-02-25','18:00','20:00',120], ['2026-02-27','17:00','19:00',120],
       ['2026-03-06','17:00','18:00', 60], ['2026-03-07','09:00','12:00',180],
@@ -178,21 +195,21 @@ function seedDatabase() {
       ['2026-04-18','09:00','12:00',180], ['2026-04-19','09:00','12:00',180],
       ['2026-04-22','18:00','20:00',120], ['2026-04-24','17:00','18:00', 60],
       ['2026-04-25','09:00','12:00',180],
-    ].forEach(r => insertEntry.run(alba, ...r));
+    ]) await insertEntry(alba, ...r);
 
     // ── SUSANA ──
-    const susana = getUser('Susana').id;
-    [
+    const susana = (await getUser('Susana')).id;
+    for (const r of [
       ['2026-03-27','11:00','12:00',60],
       ['2026-04-07','09:00','10:00',60],
       ['2026-04-14','09:00','10:00',60],
-    ].forEach(r => insertEntry.run(susana, ...r));
+    ]) await insertEntry(susana, ...r);
 
     // ── ARTHUR ── (no entries yet)
 
     // ── DANI ──
-    const dani = getUser('Dani').id;
-    [
+    const dani = (await getUser('Dani')).id;
+    for (const r of [
       ['2026-03-25','17:00','21:00',240], ['2026-03-26','18:30','20:30',120],
       ['2026-03-30','18:00','21:00',180], ['2026-03-31','19:00','21:00',120],
       ['2026-04-01','17:00','20:00',180], ['2026-04-06','10:00','14:00',240],
@@ -200,15 +217,17 @@ function seedDatabase() {
       ['2026-04-12','08:00','12:00',240], ['2026-04-13','18:00','21:00',180],
       ['2026-04-15','17:00','21:00',240], ['2026-04-19','08:00','12:00',240],
       ['2026-04-22','17:00','21:00',240],
-    ].forEach(r => insertEntry.run(dani, ...r));
-    db.exec('COMMIT');
-  };
+    ]) await insertEntry(dani, ...r);
 
-  try { seedEntries(); } catch(e) { db.exec('ROLLBACK'); throw e; }
-  console.log('Database seeded successfully.');
+    await client.query('COMMIT');
+    console.log('Database seeded successfully.');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
 }
-
-seedDatabase();
 
 // ── AUTH MIDDLEWARE ──────────────────────────────────────
 function auth(req, res, next) {
@@ -228,124 +247,171 @@ function adminOnly(req, res, next) {
 }
 
 // ── AUTH ROUTES ──────────────────────────────────────────
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
-  if (!user) return res.status(401).json({ error: 'No account found with this email.' });
-  if (!bcrypt.compareSync(password, user.password)) return res.status(401).json({ error: 'Incorrect password.' });
-  const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
-});
-
-app.put('/api/auth/password', auth, (req, res) => {
-  const { current, newPassword } = req.body;
-  if (!current || !newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Invalid input' });
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
-  if (!bcrypt.compareSync(current, user.password)) return res.status(401).json({ error: 'Current password is incorrect.' });
-  const hash = bcrypt.hashSync(newPassword, 10);
-  db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hash, req.user.id);
-  res.json({ ok: true });
-});
-
-// ── ENTRY ROUTES (employee) ──────────────────────────────
-app.get('/api/entries', auth, (req, res) => {
-  const entries = db.prepare('SELECT * FROM entries WHERE user_id = ? ORDER BY date ASC').all(req.user.id);
-  res.json(entries);
-});
-
-app.post('/api/entries', auth, (req, res) => {
-  const { date, start_time, end_time, duration } = req.body;
-  if (!date || !start_time || !end_time || !duration) return res.status(400).json({ error: 'Missing fields' });
+app.post('/api/auth/login', async (req, res) => {
   try {
-    const r = db.prepare('INSERT INTO entries (user_id, date, start_time, end_time, duration) VALUES (?, ?, ?, ?, ?)').run(req.user.id, date, start_time, end_time, duration);
-    res.json(db.prepare('SELECT * FROM entries WHERE id = ?').get(r.lastInsertRowid));
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+    const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase().trim()]);
+    const user = rows[0];
+    if (!user) return res.status(401).json({ error: 'No account found with this email.' });
+    if (!bcrypt.compareSync(password, user.password)) return res.status(401).json({ error: 'Incorrect password.' });
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.put('/api/auth/password', auth, async (req, res) => {
+  try {
+    const { current, newPassword } = req.body;
+    if (!current || !newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Invalid input' });
+    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    if (!bcrypt.compareSync(current, rows[0].password)) return res.status(401).json({ error: 'Current password is incorrect.' });
+    const hash = bcrypt.hashSync(newPassword, 10);
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hash, req.user.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── ENTRY ROUTES ─────────────────────────────────────────
+app.get('/api/entries', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM entries WHERE user_id = $1 ORDER BY date ASC', [req.user.id]);
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/entries', auth, async (req, res) => {
+  try {
+    const { date, start_time, end_time, duration } = req.body;
+    if (!date || !start_time || !end_time || !duration) return res.status(400).json({ error: 'Missing fields' });
+    const { rows } = await pool.query(
+      'INSERT INTO entries (user_id, date, start_time, end_time, duration) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [req.user.id, date, start_time, end_time, duration]
+    );
+    res.json(rows[0]);
   } catch (e) {
-    if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'An entry already exists for this date.' });
+    if (e.code === '23505') return res.status(409).json({ error: 'An entry already exists for this date.' });
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-app.put('/api/entries/:id', auth, (req, res) => {
-  const { date, start_time, end_time, duration } = req.body;
-  const entry = db.prepare('SELECT * FROM entries WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
-  if (!entry) return res.status(404).json({ error: 'Not found' });
+app.put('/api/entries/:id', auth, async (req, res) => {
   try {
-    db.prepare('UPDATE entries SET date=?, start_time=?, end_time=?, duration=? WHERE id=?').run(date, start_time, end_time, duration, req.params.id);
-    res.json(db.prepare('SELECT * FROM entries WHERE id = ?').get(req.params.id));
+    const { date, start_time, end_time, duration } = req.body;
+    const check = await pool.query('SELECT * FROM entries WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    if (!check.rows[0]) return res.status(404).json({ error: 'Not found' });
+    const { rows } = await pool.query(
+      'UPDATE entries SET date=$1, start_time=$2, end_time=$3, duration=$4 WHERE id=$5 RETURNING *',
+      [date, start_time, end_time, duration, req.params.id]
+    );
+    res.json(rows[0]);
   } catch (e) {
-    if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'An entry already exists for this date.' });
+    if (e.code === '23505') return res.status(409).json({ error: 'An entry already exists for this date.' });
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-app.delete('/api/entries/:id', auth, (req, res) => {
-  const entry = db.prepare('SELECT * FROM entries WHERE id = ?').get(req.params.id);
-  if (!entry) return res.status(404).json({ error: 'Not found' });
-  // Admin can delete any entry; employee only their own
-  if (req.user.role !== 'admin' && entry.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
-  db.prepare('DELETE FROM entries WHERE id = ?').run(req.params.id);
-  res.json({ ok: true });
+app.delete('/api/entries/:id', auth, async (req, res) => {
+  try {
+    const check = await pool.query('SELECT * FROM entries WHERE id = $1', [req.params.id]);
+    if (!check.rows[0]) return res.status(404).json({ error: 'Not found' });
+    if (req.user.role !== 'admin' && check.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    await pool.query('DELETE FROM entries WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── ADMIN ROUTES ─────────────────────────────────────────
-app.get('/api/admin/users', auth, adminOnly, (req, res) => {
-  const users = db.prepare("SELECT id, name, email, role, created_at FROM users WHERE role != 'admin' ORDER BY name").all();
-  res.json(users);
+app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, name, email, role, TO_CHAR(created_at, 'YYYY-MM-DD') as created_at FROM users WHERE role != 'admin' ORDER BY name"
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
 });
 
-app.post('/api/admin/users', auth, adminOnly, (req, res) => {
-  const { name, email, password, role } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ error: 'Missing fields' });
+app.post('/api/admin/users', auth, adminOnly, async (req, res) => {
   try {
+    const { name, email, password, role } = req.body;
+    if (!name || !email || !password) return res.status(400).json({ error: 'Missing fields' });
     const hash = bcrypt.hashSync(password, 10);
-    const r = db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)').run(name, email.toLowerCase().trim(), hash, role || 'employee');
-    res.json({ id: r.lastInsertRowid, name, email, role: role || 'employee' });
+    const { rows } = await pool.query(
+      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
+      [name, email.toLowerCase().trim(), hash, role || 'employee']
+    );
+    res.json(rows[0]);
   } catch (e) {
-    if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Email already exists.' });
+    if (e.code === '23505') return res.status(409).json({ error: 'Email already exists.' });
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-app.put('/api/admin/users/:id', auth, adminOnly, (req, res) => {
-  const { name, email, role, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
-  if (!user) return res.status(404).json({ error: 'Not found' });
-  const newEmail = email ? email.toLowerCase().trim() : user.email;
-  const newPass = password ? bcrypt.hashSync(password, 10) : user.password;
-  db.prepare('UPDATE users SET name=?, email=?, role=?, password=? WHERE id=?').run(name || user.name, newEmail, role || user.role, newPass, req.params.id);
-  res.json({ ok: true });
-});
-
-app.delete('/api/admin/users/:id', auth, adminOnly, (req, res) => {
-  db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
-  res.json({ ok: true });
-});
-
-app.get('/api/admin/entries/:userId', auth, adminOnly, (req, res) => {
-  const entries = db.prepare('SELECT * FROM entries WHERE user_id = ? ORDER BY date ASC').all(req.params.userId);
-  res.json(entries);
-});
-
-app.put('/api/admin/entries/:id', auth, adminOnly, (req, res) => {
-  const { date, start_time, end_time, duration } = req.body;
+app.put('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
   try {
-    db.prepare('UPDATE entries SET date=?, start_time=?, end_time=?, duration=? WHERE id=?').run(date, start_time, end_time, duration, req.params.id);
-    res.json(db.prepare('SELECT * FROM entries WHERE id = ?').get(req.params.id));
+    const { name, email, role, password } = req.body;
+    const existing = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+    if (!existing.rows[0]) return res.status(404).json({ error: 'Not found' });
+    const u = existing.rows[0];
+    const newPass = password ? bcrypt.hashSync(password, 10) : u.password;
+    await pool.query(
+      'UPDATE users SET name=$1, email=$2, role=$3, password=$4 WHERE id=$5',
+      [name || u.name, email ? email.toLowerCase().trim() : u.email, role || u.role, newPass, req.params.id]
+    );
+    res.json({ ok: true });
   } catch (e) {
-    if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'An entry already exists for this date.' });
+    if (e.code === '23505') return res.status(409).json({ error: 'Email already exists.' });
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Serve the SPA for all non-API routes
+app.delete('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.get('/api/admin/entries/:userId', auth, adminOnly, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM entries WHERE user_id = $1 ORDER BY date ASC', [req.params.userId]);
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.put('/api/admin/entries/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const { date, start_time, end_time, duration } = req.body;
+    const { rows } = await pool.query(
+      'UPDATE entries SET date=$1, start_time=$2, end_time=$3, duration=$4 WHERE id=$5 RETURNING *',
+      [date, start_time, end_time, duration, req.params.id]
+    );
+    res.json(rows[0]);
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'An entry already exists for this date.' });
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Serve SPA for all non-API routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🏠 House of Habits Timesheet running at http://localhost:${PORT}\n`);
-  console.log(`   Admin login: hayajeries10@gmail.com`);
-  console.log(`   Admin password: HoH@Admin2026`);
-  console.log(`   Employee default password: habits2026\n`);
-});
+// ── START ────────────────────────────────────────────────
+async function start() {
+  try {
+    await setupDatabase();
+    await seedDatabase();
+    app.listen(PORT, () => {
+      console.log(`\n🏠 House of Habits Timesheet running at http://localhost:${PORT}\n`);
+      console.log(`   Admin:    hayajeries10@gmail.com / HoH@Admin2026`);
+      console.log(`   Employees default password: habits2026\n`);
+    });
+  } catch (e) {
+    console.error('Failed to start:', e.message);
+    process.exit(1);
+  }
+}
+
+start();
