@@ -399,19 +399,13 @@ app.get('*', (req, res) => {
 });
 
 // ── START ────────────────────────────────────────────────
-async function start() {
-  try {
-    await setupDatabase();
-    await seedDatabase();
-    app.listen(PORT, () => {
-      console.log(`\n🏠 House of Habits Timesheet running at http://localhost:${PORT}\n`);
-      console.log(`   Admin:    hayajeries10@gmail.com / HoH@Admin2026`);
-      console.log(`   Employees default password: habits2026\n`);
-    });
-  } catch (e) {
-    console.error('Failed to start:', e.message);
-    process.exit(1);
-  }
-}
-
-start();
+app.listen(PORT, () => {
+  console.log(`\n🏠 House of Habits Timesheet running at http://localhost:${PORT}\n`);
+  setupDatabase()
+    .then(() => seedDatabase())
+    .then(() => {
+      console.log('   Admin:    hayajeries10@gmail.com / HoH@Admin2026');
+      console.log('   Employees default password: habits2026\n');
+    })
+    .catch(e => console.error('DB setup error:', e.message));
+});
