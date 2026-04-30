@@ -41,7 +41,7 @@
   #page-auth.active { display: flex; }
   .auth-card { background: var(--white); border-radius: 20px; padding: 2.5rem; width: 100%; max-width: 400px; box-shadow: var(--shadow-lg); }
   .auth-logo { text-align: center; margin-bottom: 2rem; }
-  .auth-logo .logo-mark { width: 64px; height: 64px; background: #795445; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1rem; }
+  .auth-logo .logo-mark { width: 64px; height: 64px; background: var(--green); border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1rem; }
   .auth-logo .logo-mark svg { width: 36px; height: 36px; }
   .auth-logo h1 { font-size: 20px; font-weight: 600; color: var(--green); letter-spacing: -0.3px; }
   .auth-logo p { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
@@ -177,7 +177,13 @@
   <div class="auth-card">
     <div class="auth-logo">
       <div class="logo-mark">
-        <svg viewBox="0 0 36 36" fill="none"><path d="M18 6C11.373 6 6 11.373 6 18s5.373 12 12 12 12-5.373 12-12S24.627 6 18 6zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm0 6c3.314 0 6 2.686 6 6H12c0-3.314 2.686-6 6-6z" fill="white"/></svg>
+        <svg viewBox="0 0 36 36" fill="none">
+          <rect x="1"  y="2" width="6" height="32" rx="3" fill="white"/>
+          <rect x="15" y="2" width="6" height="32" rx="3" fill="white"/>
+          <rect x="29" y="2" width="6" height="32" rx="3" fill="white"/>
+          <rect x="1"  y="13" width="20" height="10" rx="5" fill="white"/>
+          <rect x="15" y="13" width="20" height="10" rx="5" fill="white"/>
+        </svg>
       </div>
       <h1>House of Habits</h1>
       <p id="auth-subtitle">Employee Time Tracking</p>
@@ -205,7 +211,13 @@
     <div class="topbar-left">
       <div class="topbar-logo">
         <div class="dot">
-          <svg width="16" height="16" viewBox="0 0 36 36" fill="none"><path d="M18 6C11.373 6 6 11.373 6 18s5.373 12 12 12 12-5.373 12-12S24.627 6 18 6zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm0 6c3.314 0 6 2.686 6 6H12c0-3.314 2.686-6 6-6z" fill="white"/></svg>
+          <svg width="16" height="16" viewBox="0 0 36 36" fill="none">
+            <rect x="1"  y="2" width="6" height="32" rx="3" fill="white"/>
+            <rect x="15" y="2" width="6" height="32" rx="3" fill="white"/>
+            <rect x="29" y="2" width="6" height="32" rx="3" fill="white"/>
+            <rect x="1"  y="13" width="20" height="10" rx="5" fill="white"/>
+            <rect x="15" y="13" width="20" height="10" rx="5" fill="white"/>
+          </svg>
         </div>
         House of Habits
       </div>
