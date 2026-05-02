@@ -375,18 +375,70 @@
 
     <!-- ADMIN MANAGE USERS -->
     <div id="view-admin-manage" style="display:none;">
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title" id="lbl-manageusers">Manage Users</div>
-          <button class="btn btn-primary btn-sm" onclick="openAddUser()" id="btn-adduser">+ Add Employee</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th id="th-name">Name</th><th id="th-email">Email</th><th id="th-role">Role</th><th id="th-joined">Joined</th><th></th></tr></thead>
-            <tbody id="admin-users-body"></tbody>
-          </table>
+
+      <!-- USER LIST -->
+      <div id="manage-list">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title" id="lbl-manageusers">Manage Users</div>
+            <button class="btn btn-primary btn-sm" onclick="openAddUser()" id="btn-adduser">+ Add Employee</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th id="th-name">Name</th><th id="th-email">Email</th><th id="th-role">Role</th><th id="th-joined">Joined</th><th></th></tr></thead>
+              <tbody id="admin-users-body"></tbody>
+            </table>
+          </div>
         </div>
       </div>
+
+      <!-- EDIT / ADD USER FORM PAGE -->
+      <div id="manage-edit-form" style="display:none;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:1.25rem;">
+          <button class="btn btn-outline btn-sm" onclick="closeUserEdit()">&#8592; Back</button>
+          <span class="card-title" id="eu-page-title" style="font-size:18px;"></span>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:1.5rem;">
+            <div id="eu-avatar" onclick="document.getElementById('eu-pic-input').click()" style="width:96px;height:96px;border-radius:50%;background:var(--green-pale);border:3px solid var(--border-strong);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;margin-bottom:8px;">
+              <span id="eu-initials" style="font-size:32px;font-weight:700;color:var(--green);"></span>
+              <img id="eu-avatar-img" src="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">
+            </div>
+            <span style="font-size:12px;color:var(--text-muted);">Click photo to change</span>
+            <input type="file" id="eu-pic-input" accept="image/*" style="display:none;" onchange="handleEuPic(this)">
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group" style="margin:0;"><label>First name *</label><input type="text" id="eu-firstname" placeholder="First name"></div>
+            <div class="form-group" style="margin:0;"><label>Last name</label><input type="text" id="eu-lastname" placeholder="Last name"></div>
+          </div>
+          <div class="form-group" style="margin-top:12px;"><label>Email address *</label><input type="email" id="eu-email" placeholder="name@houseofhabits.nl"></div>
+          <div class="form-group"><label>Date of birth</label><input type="date" id="eu-birthdate"></div>
+          <div class="form-group">
+            <label>Role</label>
+            <select id="eu-role">
+              <option value="employee">Employee</option>
+              <option value="trainer">Trainer</option>
+              <option value="frontdesk">Front Desk</option>
+            </select>
+          </div>
+          <div id="eu-error" class="error-msg" style="display:none;margin-bottom:10px;"></div>
+          <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;">
+            <button id="eu-delete-btn" class="btn btn-danger btn-sm" onclick="openDeleteUserFromPage()" style="display:none;">Remove employee</button>
+            <button class="btn btn-primary" onclick="saveUserEdit()" id="btn-eu-save">Save profile</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:1rem;">
+          <div class="card-title" style="margin-bottom:1rem;" id="eu-pass-card-title">Password</div>
+          <div class="form-group"><label id="eu-pass-label">New password</label><input type="password" id="eu-pass" placeholder="Min. 6 characters"></div>
+          <div class="form-group"><label>Confirm password</label><input type="password" id="eu-pass-confirm" placeholder="Repeat password"></div>
+          <div id="eu-pass-error" class="error-msg" style="display:none;margin-bottom:10px;"></div>
+          <button class="btn btn-primary" onclick="saveUserPassword()" id="btn-eu-pass">Set password</button>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -420,42 +472,6 @@
   </div>
 </div>
 
-<!-- ADD/EDIT USER MODAL -->
-<div class="modal-overlay" id="user-modal">
-  <div class="modal" style="max-width:500px;max-height:90vh;overflow-y:auto;">
-    <div class="modal-title" id="user-modal-title">Add Employee</div>
-    <input type="hidden" id="user-modal-id">
-    <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:1.25rem;">
-      <div id="user-modal-avatar" onclick="document.getElementById('user-modal-pic-input').click()" style="width:80px;height:80px;border-radius:50%;background:var(--green-pale);border:2px solid var(--border-strong);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;margin-bottom:6px;">
-        <span id="user-modal-avatar-initials" style="font-size:26px;font-weight:700;color:var(--green);">?</span>
-        <img id="user-modal-avatar-img" src="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">
-      </div>
-      <span style="font-size:12px;color:var(--text-muted);" id="lbl-clickphoto2">Click to add photo</span>
-      <input type="file" id="user-modal-pic-input" accept="image/*" style="display:none;" onchange="handleUserModalPic(this)">
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div class="form-group" style="margin:0;"><label id="lbl-ufname">First name</label><input type="text" id="user-firstname" placeholder="First name"></div>
-      <div class="form-group" style="margin:0;"><label id="lbl-ulname">Last name</label><input type="text" id="user-lastname" placeholder="Last name"></div>
-    </div>
-    <div class="form-group" style="margin-top:12px;"><label id="lbl-uemail">Email address</label><input type="email" id="user-email" placeholder="name@example.com"></div>
-    <div class="form-group"><label id="lbl-ubdate">Date of birth</label><input type="date" id="user-birthdate"></div>
-    <div class="form-group">
-      <label id="lbl-urole">Role</label>
-      <select id="user-role">
-        <option value="employee">Employee</option>
-        <option value="trainer">Trainer</option>
-        <option value="frontdesk">Front Desk</option>
-      </select>
-    </div>
-    <div class="form-group"><label id="lbl-upass">Password <span style="color:var(--text-light);font-weight:400;" id="pass-hint">(min. 6 characters)</span></label><input type="password" id="user-pass" placeholder="Password"></div>
-    <div class="form-group"><label id="lbl-uconfpass">Confirm password</label><input type="password" id="user-pass-confirm" placeholder="Repeat password"></div>
-    <div id="user-error" class="error-msg" style="display:none;"></div>
-    <div class="modal-actions">
-      <button class="btn btn-outline btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveUser()" id="btn-saveuser">Save</button>
-    </div>
-  </div>
-</div>
 
 <!-- DELETE USER MODAL -->
 <div class="modal-overlay" id="delete-user-modal">
@@ -1216,95 +1232,126 @@ async function renderAdminManage() {
   }).join('');
 }
 
-let userModalPicture = '';
+let euUserId = '';
+let euPicture = '';
 
-function resetUserModal() {
-  userModalPicture = '';
-  document.getElementById('user-modal-avatar-img').src = '';
-  document.getElementById('user-modal-avatar-img').style.display = 'none';
-  document.getElementById('user-modal-avatar-initials').style.display = '';
-  document.getElementById('user-modal-avatar-initials').textContent = '?';
-  document.getElementById('user-modal-pic-input').value = '';
-}
-
-function handleUserModalPic(input) {
+function handleEuPic(input) {
   if (!input.files[0]) return;
   resizeImageToBase64(input.files[0], 300, 0.8, base64 => {
-    userModalPicture = base64;
-    const img = document.getElementById('user-modal-avatar-img');
+    euPicture = base64;
+    const img = document.getElementById('eu-avatar-img');
     img.src = base64; img.style.display = '';
-    document.getElementById('user-modal-avatar-initials').style.display = 'none';
+    document.getElementById('eu-initials').style.display = 'none';
   });
 }
 
-function openAddUser() {
-  resetUserModal();
-  document.getElementById('user-modal-id').value = '';
-  document.getElementById('user-modal-title').textContent = lang === 'nl' ? 'Medewerker toevoegen' : 'Add Employee';
-  document.getElementById('user-firstname').value = '';
-  document.getElementById('user-lastname').value = '';
-  document.getElementById('user-email').value = '';
-  document.getElementById('user-birthdate').value = '';
-  document.getElementById('user-role').value = 'employee';
-  document.getElementById('user-pass').value = '';
-  document.getElementById('user-pass-confirm').value = '';
-  document.getElementById('pass-hint').textContent = lang === 'nl' ? '(min. 6 tekens)' : '(min. 6 characters)';
-  document.getElementById('user-error').style.display = 'none';
-  document.getElementById('user-modal').classList.add('open');
+function showEuForm(user) {
+  euUserId = user ? user.id : '';
+  euPicture = user ? (user.picture || '') : '';
+
+  document.getElementById('eu-page-title').textContent = user
+    ? (lang === 'nl' ? 'Medewerker bewerken' : 'Edit Employee')
+    : (lang === 'nl' ? 'Medewerker toevoegen' : 'Add Employee');
+
+  const img = document.getElementById('eu-avatar-img');
+  const initials = document.getElementById('eu-initials');
+  if (euPicture) {
+    img.src = euPicture; img.style.display = ''; initials.style.display = 'none';
+  } else {
+    img.style.display = 'none'; initials.style.display = '';
+    initials.textContent = user ? (user.first_name || user.name || '?')[0].toUpperCase() : '?';
+  }
+
+  document.getElementById('eu-firstname').value = user ? (user.first_name || '') : '';
+  document.getElementById('eu-lastname').value  = user ? (user.last_name  || '') : '';
+  document.getElementById('eu-email').value     = user ? user.email : '';
+  document.getElementById('eu-birthdate').value = user ? (user.birthdate  || '') : '';
+  document.getElementById('eu-role').value      = user ? user.role : 'employee';
+  document.getElementById('eu-pass').value      = '';
+  document.getElementById('eu-pass-confirm').value = '';
+  document.getElementById('eu-error').style.display = 'none';
+  document.getElementById('eu-pass-error').style.display = 'none';
+  document.getElementById('eu-pic-input').value = '';
+
+  const isEdit = !!user;
+  document.getElementById('eu-delete-btn').style.display = isEdit ? '' : 'none';
+  document.getElementById('eu-pass-card-title').textContent = isEdit
+    ? (lang === 'nl' ? 'Wachtwoord wijzigen' : 'Change Password')
+    : (lang === 'nl' ? 'Wachtwoord instellen' : 'Set Password');
+  document.getElementById('eu-pass-label').textContent = isEdit
+    ? (lang === 'nl' ? 'Nieuw wachtwoord (leeg = ongewijzigd)' : 'New password (leave blank to keep current)')
+    : (lang === 'nl' ? 'Wachtwoord *' : 'Password *');
+
+  document.getElementById('manage-list').style.display = 'none';
+  document.getElementById('manage-edit-form').style.display = '';
 }
+
+function closeUserEdit() {
+  document.getElementById('manage-edit-form').style.display = 'none';
+  document.getElementById('manage-list').style.display = '';
+}
+
+function openAddUser() { showEuForm(null); }
 
 function openEditUser(userId) {
   const u = cachedAdminUsers.find(x => x.id === userId);
   if (!u) return;
-  resetUserModal();
-  userModalPicture = u.picture || '';
-  if (u.picture) {
-    const img = document.getElementById('user-modal-avatar-img');
-    img.src = u.picture; img.style.display = '';
-    document.getElementById('user-modal-avatar-initials').style.display = 'none';
-  } else {
-    document.getElementById('user-modal-avatar-initials').textContent = (u.first_name || u.name || '?')[0].toUpperCase();
-  }
-  document.getElementById('user-modal-id').value = userId;
-  document.getElementById('user-modal-title').textContent = lang === 'nl' ? 'Medewerker bewerken' : 'Edit Employee';
-  document.getElementById('user-firstname').value = u.first_name || '';
-  document.getElementById('user-lastname').value  = u.last_name  || '';
-  document.getElementById('user-email').value     = u.email;
-  document.getElementById('user-birthdate').value = u.birthdate || '';
-  document.getElementById('user-role').value      = u.role;
-  document.getElementById('user-pass').value      = '';
-  document.getElementById('user-pass-confirm').value = '';
-  document.getElementById('pass-hint').textContent = lang === 'nl' ? '(leeg = ongewijzigd)' : '(leave empty to keep current)';
-  document.getElementById('user-error').style.display = 'none';
-  document.getElementById('user-modal').classList.add('open');
+  showEuForm(u);
 }
 
-async function saveUser() {
-  const id         = document.getElementById('user-modal-id').value;
-  const first_name = document.getElementById('user-firstname').value.trim();
-  const last_name  = document.getElementById('user-lastname').value.trim();
-  const email      = document.getElementById('user-email').value.trim();
-  const birthdate  = document.getElementById('user-birthdate').value;
-  const role       = document.getElementById('user-role').value;
-  const pass       = document.getElementById('user-pass').value;
-  const passConf   = document.getElementById('user-pass-confirm').value;
-  const errEl = document.getElementById('user-error');
+async function saveUserEdit() {
+  const first_name = document.getElementById('eu-firstname').value.trim();
+  const last_name  = document.getElementById('eu-lastname').value.trim();
+  const email      = document.getElementById('eu-email').value.trim();
+  const birthdate  = document.getElementById('eu-birthdate').value;
+  const role       = document.getElementById('eu-role').value;
+  const errEl      = document.getElementById('eu-error');
   errEl.style.display = 'none';
 
-  if (!first_name || !email) { errEl.textContent = lang === 'nl' ? 'Voornaam en e-mail zijn verplicht.' : 'First name and email are required.'; errEl.style.display = ''; return; }
-  if (!id && pass.length < 6) { errEl.textContent = lang === 'nl' ? 'Wachtwoord minimaal 6 tekens.' : 'Password must be at least 6 characters.'; errEl.style.display = ''; return; }
-  if (pass && pass !== passConf) { errEl.textContent = lang === 'nl' ? 'Wachtwoorden komen niet overeen.' : 'Passwords do not match.'; errEl.style.display = ''; return; }
+  if (!first_name || !email) {
+    errEl.textContent = lang === 'nl' ? 'Voornaam en e-mail zijn verplicht.' : 'First name and email are required.';
+    errEl.style.display = ''; return;
+  }
 
-  const body = { first_name, last_name, email, role, birthdate, picture: userModalPicture };
-  if (pass) body.password = pass;
+  const body = { first_name, last_name, email, role, birthdate, picture: euPicture };
 
-  const res = await api(id ? 'PUT' : 'POST', id ? `/admin/users/${id}` : '/admin/users', id ? body : { ...body, password: pass });
+  if (!euUserId) {
+    const pass    = document.getElementById('eu-pass').value;
+    const confirm = document.getElementById('eu-pass-confirm').value;
+    if (pass.length < 6) { errEl.textContent = lang === 'nl' ? 'Wachtwoord minimaal 6 tekens.' : 'Password must be at least 6 characters.'; errEl.style.display = ''; return; }
+    if (pass !== confirm) { errEl.textContent = lang === 'nl' ? 'Wachtwoorden komen niet overeen.' : 'Passwords do not match.'; errEl.style.display = ''; return; }
+    body.password = pass;
+  }
+
+  const res = await api(euUserId ? 'PUT' : 'POST', euUserId ? `/admin/users/${euUserId}` : '/admin/users', body);
   if (!res || res.error) { errEl.textContent = res ? res.error : 'Error'; errEl.style.display = ''; return; }
 
   cachedAdminUsers = [];
-  closeModal();
-  showToast(id ? t('toastSaved') : t('toastAdded'));
+  showToast(euUserId ? t('toastSaved') : t('toastAdded'));
+  closeUserEdit();
   renderAdminManage();
+}
+
+async function saveUserPassword() {
+  const pass    = document.getElementById('eu-pass').value;
+  const confirm = document.getElementById('eu-pass-confirm').value;
+  const errEl   = document.getElementById('eu-pass-error');
+  errEl.style.display = 'none';
+  if (!euUserId) { saveUserEdit(); return; }
+  if (!pass) { errEl.textContent = lang === 'nl' ? 'Voer een nieuw wachtwoord in.' : 'Enter a new password.'; errEl.style.display = ''; return; }
+  if (pass.length < 6) { errEl.textContent = lang === 'nl' ? 'Minimaal 6 tekens.' : 'Minimum 6 characters.'; errEl.style.display = ''; return; }
+  if (pass !== confirm) { errEl.textContent = lang === 'nl' ? 'Wachtwoorden komen niet overeen.' : 'Passwords do not match.'; errEl.style.display = ''; return; }
+  const res = await api('PUT', `/admin/users/${euUserId}`, { password: pass });
+  if (!res || res.error) { errEl.textContent = res ? res.error : 'Error'; errEl.style.display = ''; return; }
+  document.getElementById('eu-pass').value = '';
+  document.getElementById('eu-pass-confirm').value = '';
+  showToast(t('toastPassChanged'));
+}
+
+function openDeleteUserFromPage() {
+  const u = cachedAdminUsers.find(x => x.id === euUserId);
+  if (!u) return;
+  openDeleteUser(u.id, u.name);
 }
 
 function openDeleteUser(userId, name) {
@@ -1319,6 +1366,7 @@ async function confirmDeleteUser() {
   cachedAdminUsers = [];
   delete cachedAdminEntries[id];
   closeModal();
+  closeUserEdit();
   showToast(t('toastDeleted'));
   renderAdminManage();
 }
