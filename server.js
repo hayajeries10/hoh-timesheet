@@ -38,6 +38,10 @@ async function setupDatabase() {
       role TEXT NOT NULL DEFAULT 'employee',
       created_at DATE DEFAULT CURRENT_DATE
     );
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name  TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS birthdate  TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS picture    TEXT DEFAULT '';
     CREATE TABLE IF NOT EXISTS entries (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -251,7 +255,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'No account found with this email.' });
     if (!bcrypt.compareSync(password, user.password)) return res.status(401).json({ error: 'Incorrect password.' });
     const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    res.json({ token, user: { id: user.id, name: user.name, first_name: user.first_name, last_name: user.last_name, email: user.email, role: user.role, birthdate: user.birthdate, picture: user.picture } });
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -264,6 +268,25 @@ app.put('/api/auth/password', auth, async (req, res) => {
     const hash = bcrypt.hashSync(newPassword, 10);
     await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hash, req.user.id]);
     res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.get('/api/profile', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT id, name, first_name, last_name, email, role, birthdate, picture FROM users WHERE id = $1', [req.user.id]);
+    res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.put('/api/profile', auth, async (req, res) => {
+  try {
+    const { first_name, last_name, birthdate, picture } = req.body;
+    const name = [first_name, last_name].filter(Boolean).join(' ') || req.user.name;
+    await pool.query(
+      'UPDATE users SET first_name=$1, last_name=$2, name=$3, birthdate=$4, picture=$5 WHERE id=$6',
+      [first_name || '', last_name || '', name, birthdate || '', picture || '', req.user.id]
+    );
+    res.json({ ok: true, name });
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -320,7 +343,7 @@ app.delete('/api/entries/:id', auth, async (req, res) => {
 app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      "SELECT id, name, email, role, TO_CHAR(created_at, 'YYYY-MM-DD') as created_at FROM users WHERE role != 'admin' ORDER BY name"
+      "SELECT id, name, first_name, last_name, email, role, birthdate, picture, TO_CHAR(created_at, 'YYYY-MM-DD') as created_at FROM users WHERE role != 'admin' ORDER BY name"
     );
     res.json(rows);
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
@@ -328,12 +351,13 @@ app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
 
 app.post('/api/admin/users', auth, adminOnly, async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ error: 'Missing fields' });
+    const { first_name, last_name, email, password, role, birthdate, picture } = req.body;
+    if (!first_name || !email || !password) return res.status(400).json({ error: 'Missing fields' });
+    const name = [first_name, last_name].filter(Boolean).join(' ');
     const hash = bcrypt.hashSync(password, 10);
     const { rows } = await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
-      [name, email.toLowerCase().trim(), hash, role || 'employee']
+      'INSERT INTO users (name, first_name, last_name, email, password, role, birthdate, picture) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, name, first_name, last_name, email, role',
+      [name, first_name, last_name || '', email.toLowerCase().trim(), hash, role || 'employee', birthdate || '', picture || '']
     );
     res.json(rows[0]);
   } catch (e) {
@@ -344,14 +368,17 @@ app.post('/api/admin/users', auth, adminOnly, async (req, res) => {
 
 app.put('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
   try {
-    const { name, email, role, password } = req.body;
+    const { first_name, last_name, email, role, password, birthdate, picture } = req.body;
     const existing = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
     if (!existing.rows[0]) return res.status(404).json({ error: 'Not found' });
     const u = existing.rows[0];
+    const fn = first_name !== undefined ? first_name : u.first_name;
+    const ln = last_name  !== undefined ? last_name  : u.last_name;
+    const name = [fn, ln].filter(Boolean).join(' ') || u.name;
     const newPass = password ? bcrypt.hashSync(password, 10) : u.password;
     await pool.query(
-      'UPDATE users SET name=$1, email=$2, role=$3, password=$4 WHERE id=$5',
-      [name || u.name, email ? email.toLowerCase().trim() : u.email, role || u.role, newPass, req.params.id]
+      'UPDATE users SET name=$1, first_name=$2, last_name=$3, email=$4, role=$5, password=$6, birthdate=$7, picture=$8 WHERE id=$9',
+      [name, fn, ln, email ? email.toLowerCase().trim() : u.email, role || u.role, newPass, birthdate !== undefined ? birthdate : u.birthdate, picture !== undefined ? picture : u.picture, req.params.id]
     );
     res.json({ ok: true });
   } catch (e) {
