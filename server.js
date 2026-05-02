@@ -42,6 +42,15 @@ async function setupDatabase() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name  TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS birthdate  TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS picture    TEXT DEFAULT '';
+    CREATE TABLE IF NOT EXISTS events (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      event_date TEXT NOT NULL,
+      event_type TEXT NOT NULL DEFAULT 'special',
+      color TEXT DEFAULT '',
+      description TEXT DEFAULT '',
+      created_at TIMESTAMP DEFAULT NOW()
+    );
     CREATE TABLE IF NOT EXISTS entries (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -413,6 +422,66 @@ app.put('/api/admin/entries/:id', auth, adminOnly, async (req, res) => {
     if (e.code === '23505') return res.status(409).json({ error: 'An entry already exists for this date.' });
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// ── EVENTS ───────────────────────────────────────────────
+app.get('/api/events', auth, async (req, res) => {
+  try {
+    const from = req.query.from || '2020-01-01';
+    const to   = req.query.to   || '2030-12-31';
+    const { rows: events } = await pool.query(
+      'SELECT * FROM events WHERE event_date >= $1 AND event_date <= $2 ORDER BY event_date',
+      [from, to]
+    );
+    // Attach birthday events from users
+    const { rows: users } = await pool.query(
+      "SELECT name, first_name, birthdate FROM users WHERE birthdate IS NOT NULL AND birthdate != '' AND role != 'admin'"
+    );
+    const fromYear = parseInt(from.split('-')[0]);
+    const toYear   = parseInt(to.split('-')[0]);
+    const bdays = [];
+    for (const u of users) {
+      if (!u.birthdate) continue;
+      const [, mm, dd] = u.birthdate.split('-');
+      const displayName = u.first_name || u.name;
+      for (let y = fromYear; y <= toYear + 1; y++) {
+        const d = `${y}-${mm}-${dd}`;
+        if (d >= from && d <= to) bdays.push({ id: `bday-${u.name}-${y}`, title: `${displayName}'s Birthday`, event_date: d, event_type: 'birthday', color: '#7c3aed', description: '' });
+      }
+    }
+    const all = [...events, ...bdays].sort((a, b) => a.event_date.localeCompare(b.event_date));
+    res.json(all);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/events', auth, adminOnly, async (req, res) => {
+  try {
+    const { title, event_date, event_type, color, description } = req.body;
+    if (!title || !event_date) return res.status(400).json({ error: 'Title and date required' });
+    const { rows } = await pool.query(
+      'INSERT INTO events (title, event_date, event_type, color, description) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [title, event_date, event_type || 'special', color || '', description || '']
+    );
+    res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.put('/api/events/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const { title, event_date, event_type, color, description } = req.body;
+    const { rows } = await pool.query(
+      'UPDATE events SET title=$1, event_date=$2, event_type=$3, color=$4, description=$5 WHERE id=$6 RETURNING *',
+      [title, event_date, event_type || 'special', color || '', description || '', req.params.id]
+    );
+    res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/events/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM events WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
 });
 
 // Serve SPA for all non-API routes
