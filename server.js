@@ -548,11 +548,60 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// ── SEED SHIFTS (week of 11–17 May 2026) ─────────────────
+async function seedShifts() {
+  const { rows: existing } = await pool.query('SELECT COUNT(*) as c FROM shifts');
+  if (parseInt(existing[0].c) > 0) return;
+
+  const getUser = async (name) => {
+    const r = await pool.query('SELECT id FROM users WHERE name = $1', [name]);
+    return r.rows[0]?.id;
+  };
+
+  const insert = async (userId, date, start, end) => {
+    if (!userId) return;
+    await pool.query(
+      'INSERT INTO shifts (user_id, shift_date, start_time, end_time) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id, shift_date) DO NOTHING',
+      [userId, date, start, end]
+    );
+  };
+
+  const [haya, caitilin, elmira, sanne] = await Promise.all([
+    getUser('Haya'), getUser('Caitilin'), getUser('Elmira'), getUser('Sanne'),
+  ]);
+
+  // Week 11–17 May 2026 — derived from the weekly schedule sheet
+  // Morning: Haya (Mon–Fri), Sanne (Sat)
+  // Evening: Caitilin Mon–Thu, Elmira Fri
+  await Promise.all([
+    // Monday May 11
+    insert(haya,     '2026-05-11', '07:45', '12:00'),
+    insert(caitilin, '2026-05-11', '16:30', '20:30'),
+    // Tuesday May 12
+    insert(haya,     '2026-05-12', '07:45', '12:00'),
+    insert(caitilin, '2026-05-12', '16:30', '21:15'),
+    // Wednesday May 13
+    insert(haya,     '2026-05-13', '07:45', '12:00'),
+    insert(caitilin, '2026-05-13', '16:30', '20:15'),
+    // Thursday May 14
+    insert(haya,     '2026-05-14', '07:45', '12:00'),
+    insert(caitilin, '2026-05-14', '16:30', '21:15'),
+    // Friday May 15
+    insert(haya,     '2026-05-15', '07:45', '12:00'),
+    insert(elmira,   '2026-05-15', '16:30', '19:30'),
+    // Saturday May 16
+    insert(sanne,    '2026-05-16', '07:45', '11:30'),
+  ]);
+
+  console.log('Shifts seeded for week 11–17 May 2026.');
+}
+
 // ── START ────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🏠 House of Habits Timesheet running at http://localhost:${PORT}\n`);
   setupDatabase()
     .then(() => seedDatabase())
+    .then(() => seedShifts())
     .then(() => {
       console.log('   Admin:    hayajeries10@gmail.com / HoH@Admin2026');
       console.log('   Employees default password: habits2026\n');

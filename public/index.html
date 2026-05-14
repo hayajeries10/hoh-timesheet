@@ -315,6 +315,7 @@
       <button class="tab-btn" onclick="showTab('admin-summary')" id="tab-adminsum">Monthly Summary</button>
       <button class="tab-btn" onclick="showTab('admin-manage')" id="tab-manage">Manage Users</button>
       <button class="tab-btn" onclick="showTab('admin-events')" id="tab-events">Events</button>
+      <button class="tab-btn" onclick="showTab('admin-shifts')" id="tab-shifts">Shifts</button>
     </div>
 
     <!-- CALENDAR -->
@@ -343,6 +344,24 @@
           <button class="btn btn-primary btn-sm" onclick="openAddEvent()">+ Add Event</button>
         </div>
         <div id="events-list-content"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- ADMIN SHIFTS MANAGEMENT -->
+    <div id="view-admin-shifts" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Front Desk Shifts</div>
+            <div class="card-subtitle">Planned shifts shown in the calendar</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openAddShift()">+ Add Shift</button>
+        </div>
+        <div class="admin-emp-select" style="margin-bottom:1rem;">
+          <label style="font-size:13px;font-weight:500;color:var(--text-muted);">Filter week:</label>
+          <input type="date" id="shifts-week-filter" style="padding:8px 12px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);font-size:14px;font-family:var(--font);color:var(--text);background:var(--white);outline:none;" onchange="renderAdminShifts()">
+        </div>
+        <div id="shifts-list-content"><div class="loading">Loading…</div></div>
       </div>
     </div>
 
@@ -616,6 +635,29 @@
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveEvent()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD/EDIT SHIFT MODAL -->
+<div class="modal-overlay" id="shift-modal">
+  <div class="modal">
+    <div class="modal-title" id="shift-modal-title">Add Shift</div>
+    <input type="hidden" id="shift-modal-id">
+    <div class="form-group">
+      <label>Employee *</label>
+      <select id="shift-emp-select"></select>
+    </div>
+    <div class="form-group"><label>Date *</label><input type="date" id="shift-date"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group" style="margin:0;"><label>Start time *</label><input type="time" id="shift-start"></div>
+      <div class="form-group" style="margin:0;"><label>End time *</label><input type="time" id="shift-end"></div>
+    </div>
+    <div class="form-group" style="margin-top:12px;"><label>Notes <span style="color:var(--text-light);font-weight:400;">(optional)</span></label><input type="text" id="shift-notes" placeholder="e.g. Opening shift"></div>
+    <div id="shift-modal-error" class="error-msg" style="display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveShift()">Save</button>
     </div>
   </div>
 </div>
@@ -964,13 +1006,16 @@ function renderWeekView(fromS, todayS, evts, shifts) {
       : '';
     const emptyHtml = !dayEvts.length && !dayShifts.length && !myEntry
       ? `<div style="font-size:11px;color:var(--text-light);text-align:center;padding:8px 0;">—</div>` : '';
+    const addShiftBtn = currentUser.role === 'admin'
+      ? `<div style="padding:4px 5px 0;"><button onclick="event.stopPropagation();openAddShift('${s}')" style="width:100%;font-size:10px;padding:3px;background:none;border:1px dashed var(--green-muted);border-radius:4px;color:var(--green-light);cursor:pointer;font-family:var(--font);">+ shift</button></div>`
+      : '';
 
     return `<div class="cal-week-col${isToday?' cal-today':''}">
       <div class="cal-week-hdr" onclick="calAnchor=new Date('${s}');setCalView('day')">
         <div class="cal-week-day-name">${dayNames[d.getDay()]}</div>
         <div class="cal-week-day-num">${d.getDate()}</div>
       </div>
-      <div class="cal-week-body">${badgesHtml}${shiftsHtml}${myEntryHtml}${emptyHtml}</div>
+      <div class="cal-week-body">${badgesHtml}${shiftsHtml}${myEntryHtml}${emptyHtml}${addShiftBtn}</div>
     </div>`;
   }).join('');
 
@@ -1148,6 +1193,114 @@ async function deleteEvent(id) {
 }
 
 // ══════════════════════════════════════════════════════
+// SHIFTS MANAGEMENT (admin)
+// ══════════════════════════════════════════════════════
+async function renderAdminShifts() {
+  const container = document.getElementById('shifts-list-content');
+  // Set week filter default to current week Monday
+  const filterEl = document.getElementById('shifts-week-filter');
+  if (!filterEl.value) {
+    const now = new Date();
+    const mon = addDays(now, -((now.getDay() + 6) % 7)); // Monday of current week
+    filterEl.value = dateStr(mon);
+  }
+  const weekStart = filterEl.value || dateStr(new Date());
+  const weekStartDate = new Date(weekStart);
+  const from = weekStart;
+  const to   = dateStr(addDays(weekStartDate, 6));
+
+  const shifts = await api('GET', `/shifts?from=${from}&to=${to}`);
+  if (!shifts) { container.innerHTML = '<p class="error-msg">Failed to load shifts.</p>'; return; }
+
+  if (!shifts.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">📅</div><h3>No shifts this week.</h3><p>Add shifts with the button above.</p></div>`;
+    return;
+  }
+
+  container.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Date</th><th>Day</th><th>Employee</th><th>Start</th><th>End</th><th>Notes</th><th></th></tr></thead>
+    <tbody>${shifts.map(s => `<tr>
+      <td>${s.shift_date}</td>
+      <td class="td-day">${getDayName(s.shift_date)}</td>
+      <td style="font-weight:600;">${s.first_name || s.name.split(' ')[0]} <span class="badge badge-gray" style="margin-left:4px;">${t('roles')[s.role]||s.role}</span></td>
+      <td class="td-mono">${s.start_time}</td>
+      <td class="td-mono">${s.end_time}</td>
+      <td style="font-size:13px;color:var(--text-muted);">${s.notes || '—'}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-outline btn-sm btn-icon" onclick="openEditShift(${s.id},'${s.shift_date}','${s.start_time}','${s.end_time}','${s.user_id}','${(s.notes||'').replace(/'/g,'')}')" title="Edit">✏️</button>
+        <button class="btn btn-outline btn-sm btn-icon" onclick="deleteShift(${s.id})" title="Delete">🗑️</button>
+      </div></td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+async function populateShiftEmpSelect(selectedId) {
+  if (!cachedAdminUsers.length) {
+    const data = await api('GET', '/admin/users');
+    cachedAdminUsers = data || [];
+  }
+  const frontdesk = cachedAdminUsers.filter(u => u.role === 'frontdesk');
+  const sel = document.getElementById('shift-emp-select');
+  sel.innerHTML = frontdesk.map(u => `<option value="${u.id}" ${String(u.id)===String(selectedId)?'selected':''}>${u.first_name || u.name.split(' ')[0]} ${u.last_name||''}</option>`).join('');
+}
+
+async function openAddShift(prefillDate) {
+  document.getElementById('shift-modal-id').value = '';
+  document.getElementById('shift-modal-title').textContent = 'Add Shift';
+  document.getElementById('shift-date').value = prefillDate || dateStr(new Date());
+  document.getElementById('shift-start').value = '07:45';
+  document.getElementById('shift-end').value = '12:00';
+  document.getElementById('shift-notes').value = '';
+  document.getElementById('shift-modal-error').style.display = 'none';
+  await populateShiftEmpSelect(null);
+  document.getElementById('shift-modal').classList.add('open');
+}
+
+async function openEditShift(id, date, start, end, userId, notes) {
+  document.getElementById('shift-modal-id').value = id;
+  document.getElementById('shift-modal-title').textContent = 'Edit Shift';
+  document.getElementById('shift-date').value = date;
+  document.getElementById('shift-start').value = start;
+  document.getElementById('shift-end').value = end;
+  document.getElementById('shift-notes').value = notes;
+  document.getElementById('shift-modal-error').style.display = 'none';
+  await populateShiftEmpSelect(userId);
+  document.getElementById('shift-modal').classList.add('open');
+}
+
+async function saveShift() {
+  const id    = document.getElementById('shift-modal-id').value;
+  const userId = document.getElementById('shift-emp-select').value;
+  const date  = document.getElementById('shift-date').value;
+  const start = document.getElementById('shift-start').value;
+  const end   = document.getElementById('shift-end').value;
+  const notes = document.getElementById('shift-notes').value.trim();
+  const errEl = document.getElementById('shift-modal-error');
+  errEl.style.display = 'none';
+  if (!userId || !date || !start || !end) { errEl.textContent = 'All required fields must be filled.'; errEl.style.display = ''; return; }
+  if (parseTime(end) <= parseTime(start)) { errEl.textContent = 'End time must be after start time.'; errEl.style.display = ''; return; }
+  const body = id
+    ? { start_time: start, end_time: end, notes }
+    : { user_id: parseInt(userId), shift_date: date, start_time: start, end_time: end, notes };
+  const res = await api(id ? 'PUT' : 'POST', id ? `/shifts/${id}` : '/shifts', body);
+  if (!res || res.error) { errEl.textContent = res ? res.error : 'Error'; errEl.style.display = ''; return; }
+  cachedShifts = {};
+  closeModal();
+  showToast(id ? 'Shift updated.' : 'Shift added.');
+  renderAdminShifts();
+  renderCalendar();
+}
+
+async function deleteShift(id) {
+  if (!confirm('Delete this shift?')) return;
+  await api('DELETE', `/shifts/${id}`);
+  cachedShifts = {};
+  showToast('Shift deleted.');
+  renderAdminShifts();
+  renderCalendar();
+}
+
+// ══════════════════════════════════════════════════════
 // CHANGE PASSWORD
 // ══════════════════════════════════════════════════════
 function openChangePassword() {
@@ -1270,14 +1423,15 @@ async function doChangePasswordProfile() {
 // ══════════════════════════════════════════════════════
 function showTab(tab) {
   activeTab = tab;
-  ['calendar','my-time','my-summary','my-profile','admin-overview','admin-employee','admin-summary','admin-manage','admin-events'].forEach(v => {
+  ['calendar','my-time','my-summary','my-profile','admin-overview','admin-employee','admin-summary','admin-manage','admin-events','admin-shifts'].forEach(v => {
     const el = document.getElementById('view-' + v); if (el) el.style.display = 'none';
   });
   const tabMap = {
     'calendar': currentUser && currentUser.role === 'admin' ? 'tab-calendar-adm' : 'tab-calendar-emp',
     'my-time':'tab-mytime','my-summary':'tab-mysummary','my-profile':'tab-myprofile',
     'admin-overview':'tab-overview','admin-employee':'tab-empdetail',
-    'admin-summary':'tab-adminsum','admin-manage':'tab-manage','admin-events':'tab-events'
+    'admin-summary':'tab-adminsum','admin-manage':'tab-manage','admin-events':'tab-events',
+    'admin-shifts':'tab-shifts'
   };
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById(tabMap[tab]); if (btn) btn.classList.add('active');
@@ -1295,6 +1449,7 @@ function renderCurrentView() {
   else if (activeTab === 'admin-summary') renderAdminSummary();
   else if (activeTab === 'admin-manage') renderAdminManage();
   else if (activeTab === 'admin-events') renderEventsList();
+  else if (activeTab === 'admin-shifts') renderAdminShifts();
 }
 
 // ══════════════════════════════════════════════════════
