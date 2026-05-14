@@ -42,6 +42,9 @@ async function setupDatabase() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name  TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS birthdate  TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS picture    TEXT DEFAULT '';
+    UPDATE users SET role='frontdesk' WHERE name IN ('Haya','Caitilin','Elmira','Sanne') AND role='employee';
+    UPDATE users SET role='trainer'   WHERE name IN ('Arthur','Dani')                    AND role IN ('employee','trainer');
+    UPDATE users SET role='pilates'   WHERE name IN ('Alba','Susana')                    AND role='employee';
     CREATE TABLE IF NOT EXISTS events (
       id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
@@ -60,6 +63,16 @@ async function setupDatabase() {
       duration INTEGER NOT NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       UNIQUE (user_id, date)
+    );
+    CREATE TABLE IF NOT EXISTS shifts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      shift_date TEXT NOT NULL,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(user_id, shift_date)
     );
   `);
 }
@@ -83,19 +96,19 @@ async function seedDatabase() {
 
     const empHash = bcrypt.hashSync('habits2026', 10);
     const employees = [
-      { name: 'Haya',     email: 'haya@houseofhabits.nl' },
-      { name: 'Caitilin', email: 'caitilin@houseofhabits.nl' },
-      { name: 'Elmira',   email: 'elmira@houseofhabits.nl' },
-      { name: 'Sanne',    email: 'sanne@houseofhabits.nl' },
-      { name: 'Alba',     email: 'alba@houseofhabits.nl' },
-      { name: 'Susana',   email: 'susana@houseofhabits.nl' },
-      { name: 'Arthur',   email: 'arthur@houseofhabits.nl' },
-      { name: 'Dani',     email: 'dani@houseofhabits.nl' },
+      { name: 'Haya',     email: 'haya@houseofhabits.nl',     role: 'frontdesk' },
+      { name: 'Caitilin', email: 'caitilin@houseofhabits.nl', role: 'frontdesk' },
+      { name: 'Elmira',   email: 'elmira@houseofhabits.nl',   role: 'frontdesk' },
+      { name: 'Sanne',    email: 'sanne@houseofhabits.nl',    role: 'frontdesk' },
+      { name: 'Alba',     email: 'alba@houseofhabits.nl',     role: 'pilates'   },
+      { name: 'Susana',   email: 'susana@houseofhabits.nl',   role: 'pilates'   },
+      { name: 'Arthur',   email: 'arthur@houseofhabits.nl',   role: 'trainer'   },
+      { name: 'Dani',     email: 'dani@houseofhabits.nl',     role: 'trainer'   },
     ];
     for (const e of employees) {
       await client.query(
         'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING',
-        [e.name, e.email, empHash, 'employee']
+        [e.name, e.email, empHash, e.role]
       );
     }
 
@@ -422,6 +435,52 @@ app.put('/api/admin/entries/:id', auth, adminOnly, async (req, res) => {
     if (e.code === '23505') return res.status(409).json({ error: 'An entry already exists for this date.' });
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// ── SHIFTS (scheduled) ───────────────────────────────────
+app.get('/api/shifts', auth, async (req, res) => {
+  try {
+    const from = req.query.from || '2020-01-01';
+    const to   = req.query.to   || '2030-12-31';
+    const { rows } = await pool.query(
+      `SELECT s.*, u.name, u.first_name, u.role, u.picture
+       FROM shifts s JOIN users u ON s.user_id = u.id
+       WHERE s.shift_date >= $1 AND s.shift_date <= $2
+       ORDER BY s.shift_date, s.start_time`,
+      [from, to]
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/shifts', auth, adminOnly, async (req, res) => {
+  try {
+    const { user_id, shift_date, start_time, end_time, notes } = req.body;
+    if (!user_id || !shift_date || !start_time || !end_time) return res.status(400).json({ error: 'Missing fields' });
+    const { rows } = await pool.query(
+      'INSERT INTO shifts (user_id, shift_date, start_time, end_time, notes) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (user_id, shift_date) DO UPDATE SET start_time=$3, end_time=$4, notes=$5 RETURNING *',
+      [user_id, shift_date, start_time, end_time, notes || '']
+    );
+    res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.put('/api/shifts/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const { start_time, end_time, notes } = req.body;
+    const { rows } = await pool.query(
+      'UPDATE shifts SET start_time=$1, end_time=$2, notes=$3 WHERE id=$4 RETURNING *',
+      [start_time, end_time, notes || '', req.params.id]
+    );
+    res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/shifts/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM shifts WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── EVENTS ───────────────────────────────────────────────
