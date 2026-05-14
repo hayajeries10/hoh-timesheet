@@ -96,10 +96,11 @@ async function seedDatabase() {
 
     const empHash = bcrypt.hashSync('habits2026', 10);
     const employees = [
-      { name: 'Haya',     email: 'haya@houseofhabits.nl',     role: 'frontdesk' },
-      { name: 'Caitilin', email: 'caitilin@houseofhabits.nl', role: 'frontdesk' },
-      { name: 'Elmira',   email: 'elmira@houseofhabits.nl',   role: 'frontdesk' },
-      { name: 'Sanne',    email: 'sanne@houseofhabits.nl',    role: 'frontdesk' },
+      { name: 'Haya',      email: 'haya@houseofhabits.nl',      role: 'frontdesk' },
+      { name: 'Caitilin',  email: 'caitilin@houseofhabits.nl',  role: 'frontdesk' },
+      { name: 'Elmira',    email: 'elmira@houseofhabits.nl',    role: 'frontdesk' },
+      { name: 'Sanne',     email: 'sanne@houseofhabits.nl',     role: 'frontdesk' },
+      { name: 'Charlotte', email: 'charlotte@houseofhabits.nl', role: 'frontdesk' },
       { name: 'Alba',     email: 'alba@houseofhabits.nl',     role: 'pilates'   },
       { name: 'Susana',   email: 'susana@houseofhabits.nl',   role: 'pilates'   },
       { name: 'Arthur',   email: 'arthur@houseofhabits.nl',   role: 'trainer'   },
@@ -549,11 +550,14 @@ app.get('*', (req, res) => {
 });
 
 // ── SEED SHIFTS (week of 11–17 May 2026) ─────────────────
-// Color-coded schedule from Google Sheet (gid=1000085054):
-//   Pink  #e49edd = Haya       → mornings Mon–Fri 07:45–13:00
-//   Orange #ffc000 = Caitilin  → evenings Tue/Thu/Fri
-//   Blue  #83caeb = Sanne      → Saturday morning
-//   Green #c1f0c8 = Elmira     → Mon/Wed evenings + Sunday morning
+// Schedule read from color-coded Google Sheet (confirmed by admin):
+//   Mon: Haya morning, Elmira evening
+//   Tue: Charlotte morning, Caitilin evening
+//   Wed: Haya morning, Elmira evening
+//   Thu: Elmira morning, Caitilin evening
+//   Fri: Elmira morning, Caitilin evening
+//   Sat: Caitilin morning only
+//   Sun: Elmira morning
 async function seedShifts() {
   const { rows: existing } = await pool.query('SELECT COUNT(*) as c FROM shifts');
   if (parseInt(existing[0].c) > 0) return;
@@ -571,37 +575,30 @@ async function seedShifts() {
     );
   };
 
-  const [haya, caitilin, elmira, sanne] = await Promise.all([
-    getUser('Haya'), getUser('Caitilin'), getUser('Elmira'), getUser('Sanne'),
+  const [haya, caitilin, elmira, charlotte] = await Promise.all([
+    getUser('Haya'), getUser('Caitilin'), getUser('Elmira'), getUser('Charlotte'),
   ]);
 
   for (const [uid, date, s, e] of [
-    // Monday May 11
-    [haya,     '2026-05-11', '07:45', '13:00'],
-    [elmira,   '2026-05-11', '16:30', '20:30'],
-    // Tuesday May 12
-    [haya,     '2026-05-12', '07:45', '13:00'],
-    [caitilin, '2026-05-12', '16:30', '21:15'],
-    // Wednesday May 13
-    [haya,     '2026-05-13', '07:45', '13:00'],
-    [elmira,   '2026-05-13', '16:30', '20:15'],
-    // Thursday May 14
-    [haya,     '2026-05-14', '07:45', '13:00'],
-    [caitilin, '2026-05-14', '16:30', '21:15'],
-    // Friday May 15
-    [haya,     '2026-05-15', '07:45', '13:00'],
-    [caitilin, '2026-05-15', '16:30', '19:30'],
-    // Saturday May 16
-    [sanne,    '2026-05-16', '07:45', '12:30'],
-    // Sunday May 17
-    [elmira,   '2026-05-17', '07:45', '11:30'],
+    [haya,      '2026-05-11', '07:45', '13:00'],  // Mon morning
+    [elmira,    '2026-05-11', '16:30', '20:30'],  // Mon evening
+    [charlotte, '2026-05-12', '07:45', '13:00'],  // Tue morning
+    [caitilin,  '2026-05-12', '16:30', '21:15'],  // Tue evening
+    [haya,      '2026-05-13', '07:45', '13:00'],  // Wed morning
+    [elmira,    '2026-05-13', '16:30', '20:15'],  // Wed evening
+    [elmira,    '2026-05-14', '07:45', '13:00'],  // Thu morning
+    [caitilin,  '2026-05-14', '16:30', '21:15'],  // Thu evening
+    [elmira,    '2026-05-15', '07:45', '13:00'],  // Fri morning
+    [caitilin,  '2026-05-15', '16:30', '19:30'],  // Fri evening
+    [caitilin,  '2026-05-16', '07:45', '12:30'],  // Sat morning (Caitilin only)
+    [elmira,    '2026-05-17', '07:45', '11:30'],  // Sun morning
   ]) await upsert(uid, date, s, e);
 
   console.log('Shifts seeded for week 11–17 May 2026.');
 }
 
-// ── FIX SHIFTS (one-time correction for live DB) ──────────
-// Corrects the initial incorrect seed that was deployed earlier.
+// ── FIX SHIFTS (live DB correction — idempotent) ──────────
+// Replaces all 11–17 May shifts with the confirmed correct schedule.
 async function fixShiftsWeekMay11() {
   const client = await pool.connect();
   try {
@@ -611,52 +608,42 @@ async function fixShiftsWeekMay11() {
       const r = await client.query('SELECT id FROM users WHERE name = $1', [name]);
       return r.rows[0]?.id;
     };
-    const [haya, caitilin, elmira, sanne] = await Promise.all([
-      getUser('Haya'), getUser('Caitilin'), getUser('Elmira'), getUser('Sanne'),
+
+    // Ensure Charlotte exists (new employee)
+    const empHash = bcrypt.hashSync('habits2026', 10);
+    await client.query(
+      "INSERT INTO users (name, first_name, email, password, role) VALUES ('Charlotte','Charlotte','charlotte@houseofhabits.nl',$1,'frontdesk') ON CONFLICT (email) DO NOTHING",
+      [empHash]
+    );
+
+    const [haya, caitilin, elmira, charlotte] = await Promise.all([
+      getUser('Haya'), getUser('Caitilin'), getUser('Elmira'), getUser('Charlotte'),
     ]);
-    if (!haya || !caitilin || !elmira || !sanne) { await client.query('ROLLBACK'); return; }
+    if (!haya || !caitilin || !elmira || !charlotte) { await client.query('ROLLBACK'); return; }
 
-    // Haya: fix end time 12:00 → 13:00 (Mon–Fri)
-    await client.query(
-      "UPDATE shifts SET end_time='13:00' WHERE user_id=$1 AND shift_date BETWEEN '2026-05-11' AND '2026-05-15' AND end_time='12:00'",
-      [haya]
+    // Wipe the entire week and re-insert correctly
+    await client.query("DELETE FROM shifts WHERE shift_date BETWEEN '2026-05-11' AND '2026-05-17'");
+
+    const ins = async (uid, date, s, e) => client.query(
+      'INSERT INTO shifts (user_id, shift_date, start_time, end_time) VALUES ($1,$2,$3,$4)',
+      [uid, date, s, e]
     );
 
-    // Monday evening: was Caitilin → correct is Elmira 16:30–20:30
-    await client.query("DELETE FROM shifts WHERE user_id=$1 AND shift_date='2026-05-11'", [caitilin]);
-    await client.query(
-      "INSERT INTO shifts (user_id, shift_date, start_time, end_time) VALUES ($1,'2026-05-11','16:30','20:30') ON CONFLICT (user_id, shift_date) DO UPDATE SET start_time='16:30', end_time='20:30'",
-      [elmira]
-    );
-
-    // Wednesday evening: was Caitilin → correct is Elmira 16:30–20:15
-    await client.query("DELETE FROM shifts WHERE user_id=$1 AND shift_date='2026-05-13'", [caitilin]);
-    await client.query(
-      "INSERT INTO shifts (user_id, shift_date, start_time, end_time) VALUES ($1,'2026-05-13','16:30','20:15') ON CONFLICT (user_id, shift_date) DO UPDATE SET start_time='16:30', end_time='20:15'",
-      [elmira]
-    );
-
-    // Friday evening: was Elmira → correct is Caitilin 16:30–19:30
-    await client.query("DELETE FROM shifts WHERE user_id=$1 AND shift_date='2026-05-15'", [elmira]);
-    await client.query(
-      "INSERT INTO shifts (user_id, shift_date, start_time, end_time) VALUES ($1,'2026-05-15','16:30','19:30') ON CONFLICT (user_id, shift_date) DO UPDATE SET start_time='16:30', end_time='19:30'",
-      [caitilin]
-    );
-
-    // Sanne Saturday: fix end time 11:30 → 12:30
-    await client.query(
-      "UPDATE shifts SET end_time='12:30' WHERE user_id=$1 AND shift_date='2026-05-16' AND end_time='11:30'",
-      [sanne]
-    );
-
-    // Add Elmira Sunday 07:45–11:30
-    await client.query(
-      "INSERT INTO shifts (user_id, shift_date, start_time, end_time) VALUES ($1,'2026-05-17','07:45','11:30') ON CONFLICT (user_id, shift_date) DO UPDATE SET start_time='07:45', end_time='11:30'",
-      [elmira]
-    );
+    await ins(haya,      '2026-05-11', '07:45', '13:00');  // Mon morning
+    await ins(elmira,    '2026-05-11', '16:30', '20:30');  // Mon evening
+    await ins(charlotte, '2026-05-12', '07:45', '13:00');  // Tue morning
+    await ins(caitilin,  '2026-05-12', '16:30', '21:15');  // Tue evening
+    await ins(haya,      '2026-05-13', '07:45', '13:00');  // Wed morning
+    await ins(elmira,    '2026-05-13', '16:30', '20:15');  // Wed evening
+    await ins(elmira,    '2026-05-14', '07:45', '13:00');  // Thu morning
+    await ins(caitilin,  '2026-05-14', '16:30', '21:15');  // Thu evening
+    await ins(elmira,    '2026-05-15', '07:45', '13:00');  // Fri morning
+    await ins(caitilin,  '2026-05-15', '16:30', '19:30');  // Fri evening
+    await ins(caitilin,  '2026-05-16', '07:45', '12:30');  // Sat morning only
+    await ins(elmira,    '2026-05-17', '07:45', '11:30');  // Sun morning
 
     await client.query('COMMIT');
-    console.log('Applied shift corrections for week 11–17 May 2026.');
+    console.log('Shift data for week 11–17 May 2026 corrected.');
   } catch (e) {
     await client.query('ROLLBACK');
     console.error('Error fixing shifts:', e.message);
