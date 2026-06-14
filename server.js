@@ -282,6 +282,30 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
 });
 
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) return res.status(400).json({ error: 'Missing credential' });
+
+    // Verify ID token with Google
+    const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+    const payload = await verifyRes.json();
+    if (payload.error || !payload.email_verified) return res.status(401).json({ error: 'Invalid Google token' });
+
+    // Optionally check audience matches our client ID
+    const expectedAud = process.env.GOOGLE_CLIENT_ID;
+    if (expectedAud && payload.aud !== expectedAud) return res.status(401).json({ error: 'Token audience mismatch' });
+
+    const email = payload.email.toLowerCase().trim();
+    const { rows } = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [email]);
+    if (!rows.length) return res.status(401).json({ error: 'No HoH account linked to this Google address.' });
+
+    const user = rows[0];
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: { id: user.id, name: user.name, first_name: user.first_name, last_name: user.last_name, email: user.email, role: user.role, birthdate: user.birthdate, picture: user.picture } });
+  } catch (e) { console.error('Google auth error:', e); res.status(500).json({ error: 'Server error' }); }
+});
+
 app.put('/api/auth/password', auth, async (req, res) => {
   try {
     const { current, newPassword } = req.body;
