@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const pool = new Pool({
@@ -399,9 +400,10 @@ app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
 app.post('/api/admin/users', auth, adminOnly, async (req, res) => {
   try {
     const { first_name, last_name, email, password, role, birthdate, picture } = req.body;
-    if (!first_name || !email || !password) return res.status(400).json({ error: 'Missing fields' });
+    if (!first_name || !email) return res.status(400).json({ error: 'Missing fields' });
     const name = [first_name, last_name].filter(Boolean).join(' ');
-    const hash = bcrypt.hashSync(password, 10);
+    // Employees sign in with Google — a password is only a fallback, so generate one if none was set.
+    const hash = bcrypt.hashSync(password || crypto.randomBytes(24).toString('hex'), 10);
     const { rows } = await pool.query(
       'INSERT INTO users (name, first_name, last_name, email, password, role, birthdate, picture) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, name, first_name, last_name, email, role',
       [name, first_name, last_name || '', email.toLowerCase().trim(), hash, role || 'employee', birthdate || '', picture || '']

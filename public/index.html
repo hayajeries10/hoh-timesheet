@@ -88,8 +88,11 @@
   .app-content { flex: 1; padding: 2rem 1.5rem; max-width: 900px; margin: 0 auto; width: 100%; }
 
   /* ── TABS ── */
-  .tabs { display: flex; gap: 4px; margin-bottom: 2rem; background: var(--cream-dark); border-radius: var(--radius); padding: 4px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 2rem; background: var(--cream-dark); border-radius: var(--radius); padding: 4px; }
   .tab-btn { flex: 1; padding: 9px 16px; border: none; background: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text-muted); font-family: var(--font); transition: all 0.15s; white-space: nowrap; }
+  /* The admin bar has too many tabs to stretch evenly across one row — size to content and wrap instead. */
+  #admin-tabs.tabs { justify-content: flex-start; }
+  #admin-tabs .tab-btn { flex: 0 1 auto; }
   .tab-btn.active { background: var(--white); color: var(--green); box-shadow: var(--shadow); }
 
   /* ── CARDS ── */
@@ -361,9 +364,12 @@
     </div>
     <div class="tabs" id="admin-tabs" style="display:none;">
       <button class="tab-btn active" onclick="showTab('calendar')" id="tab-calendar-adm">Calendar</button>
+      <button class="tab-btn" onclick="showTab('my-time')" id="tab-mytime-adm">My Timesheet</button>
+      <button class="tab-btn" onclick="showTab('my-summary')" id="tab-mysummary-adm">Monthly Summary</button>
+      <button class="tab-btn" onclick="showTab('my-profile')" id="tab-myprofile-adm">My Profile</button>
       <button class="tab-btn" onclick="showTab('admin-overview')" id="tab-overview">Overview</button>
       <button class="tab-btn" onclick="showTab('admin-employee')" id="tab-empdetail">Employee Detail</button>
-      <button class="tab-btn" onclick="showTab('admin-summary')" id="tab-adminsum">Monthly Summary</button>
+      <button class="tab-btn" onclick="showTab('admin-summary')" id="tab-adminsum">Team Summary</button>
       <button class="tab-btn" onclick="showTab('admin-manage')" id="tab-manage">Manage Users</button>
       <button class="tab-btn" onclick="showTab('admin-events')" id="tab-events">Events</button>
       <button class="tab-btn" onclick="showTab('admin-shifts')" id="tab-shifts">Shifts</button>
@@ -403,8 +409,8 @@
       <div class="card">
         <div class="card-header">
           <div>
-            <div class="card-title">Front Desk Shifts</div>
-            <div class="card-subtitle">Planned shifts shown in the calendar</div>
+            <div class="card-title">Shifts</div>
+            <div class="card-subtitle">Planned shifts for all employees, shown in the calendar</div>
           </div>
           <button class="btn btn-primary btn-sm" onclick="openAddShift()">+ Add Shift</button>
         </div>
@@ -762,7 +768,7 @@ const T = {
     btnLogin: 'Sign in', btnSignout: 'Sign out',
     tabMytime: 'My Timesheet', tabMysummary: 'Monthly Summary',
     tabOverview: 'Overview', tabEmpDetail: 'Employee Detail',
-    tabAdminSum: 'Monthly Summary', tabManage: 'Manage Users',
+    tabAdminSum: 'Monthly Summary', tabTeamSummary: 'Team Summary', tabManage: 'Manage Users',
     lblAddEntry: 'Add Entry', lblDate: 'Date',
     lblStart: 'Start time', lblEnd: 'End time', btnAdd: 'Add',
     lblEntries: 'Time entries',
@@ -800,7 +806,7 @@ const T = {
     btnLogin: 'Inloggen', btnSignout: 'Uitloggen',
     tabMytime: 'Mijn Uren', tabMysummary: 'Maandoverzicht',
     tabOverview: 'Overzicht', tabEmpDetail: 'Medewerker Detail',
-    tabAdminSum: 'Maandoverzicht', tabManage: 'Gebruikers beheren',
+    tabAdminSum: 'Maandoverzicht', tabTeamSummary: 'Teamoverzicht', tabManage: 'Gebruikers beheren',
     lblAddEntry: 'Invoer toevoegen', lblDate: 'Datum',
     lblStart: 'Begintijd', lblEnd: 'Eindtijd', btnAdd: 'Toevoegen',
     lblEntries: 'Uren invoer',
@@ -850,8 +856,9 @@ function applyTranslations() {
   set('auth-subtitle', 'authSubtitle'); set('lbl-email', 'lblEmail'); set('lbl-password', 'lblPassword');
   set('btn-login', 'btnLogin'); set('btn-signout', 'btnSignout'); set('lbl-chgpass', 'lblChgPass');
   set('tab-mytime', 'tabMytime'); set('tab-mysummary', 'tabMysummary');
+  set('tab-mytime-adm', 'tabMytime'); set('tab-mysummary-adm', 'tabMysummary');
   set('tab-overview', 'tabOverview'); set('tab-empdetail', 'tabEmpDetail');
-  set('tab-adminsum', 'tabAdminSum'); set('tab-manage', 'tabManage');
+  set('tab-adminsum', 'tabTeamSummary'); set('tab-manage', 'tabManage');
   set('lbl-addentry', 'lblAddEntry'); set('lbl-date', 'lblDate');
   set('lbl-start', 'lblStart'); set('lbl-end', 'lblEnd'); set('btn-addentry', 'btnAdd');
   set('lbl-entries', 'lblEntries');
@@ -882,8 +889,24 @@ function today() { return new Date().toISOString().split('T')[0]; }
 function parseTime(s) { if (!s) return 0; const [h, m] = s.split(':').map(Number); return h * 60 + m; }
 function minutesToHHMM(min) { if (!min || min < 0) min = 0; return `${Math.floor(min/60)}:${String(min%60).padStart(2,'0')}`; }
 function getDayName(dateStr) { return t('days')[new Date(dateStr + 'T00:00:00').getDay()]; }
-function getMonthKey(dateStr) { return dateStr.slice(0, 7); }
-function monthLabel(key) { const [y, m] = key.split('-'); return `${t('months')[parseInt(m)-1]} ${y}`; }
+// Pay periods run the 25th of a month through the 24th of the next — not the calendar month.
+// A date on/after the 25th belongs to the period "ending" the following month.
+function getMonthKey(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (d >= 25) {
+    let ny = y, nm = m + 1;
+    if (nm > 12) { nm = 1; ny++; }
+    return `${ny}-${String(nm).padStart(2, '0')}`;
+  }
+  return `${y}-${String(m).padStart(2, '0')}`;
+}
+function monthLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  let py = y, pm = m - 1;
+  if (pm < 1) { pm = 12; py--; }
+  const months = t('months');
+  return `25 ${months[pm-1].slice(0,3)} – 24 ${months[m-1].slice(0,3)} ${y}`;
+}
 function calcStats(entries) {
   const totalMin = entries.reduce((s, e) => s + e.duration, 0);
   const days = entries.length;
@@ -905,14 +928,27 @@ function getUniqueMonths(entries) { return [...new Set(entries.map(e => getMonth
 const GOOGLE_CLIENT_ID = 'PASTE_YOUR_GOOGLE_CLIENT_ID_HERE';
 
 function initGoogleSignIn() {
-  if (typeof google === 'undefined' || !GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('PASTE_YOUR')) {
-    document.getElementById('btn-google-signin').style.display = 'none';
-    document.getElementById('auth-email-section').style.display = 'block';
-    document.querySelector('.auth-email-toggle').style.display = 'none';
-    document.querySelector('.auth-divider').style.display = 'none';
+  const googleReady = typeof google !== 'undefined' && GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes('PASTE_YOUR');
+  const googleBtn = document.getElementById('btn-google-signin');
+  const emailSection = document.getElementById('auth-email-section');
+  const emailToggle = document.querySelector('.auth-email-toggle');
+  const divider = document.querySelector('.auth-divider');
+
+  if (googleReady) {
+    // Google Sign-In is fully configured — this is the only way in, for every account.
+    googleBtn.style.display = '';
+    emailSection.style.display = 'none';
+    emailToggle.style.display = 'none';
+    divider.style.display = 'none';
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
     return;
   }
-  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+
+  // Google Sign-In isn't configured yet — fall back to email/password so the app stays usable.
+  googleBtn.style.display = 'none';
+  emailSection.style.display = 'block';
+  emailToggle.style.display = 'none';
+  divider.style.display = 'none';
 }
 
 function triggerGoogleSignIn() {
@@ -1072,9 +1108,18 @@ function eventBadge(e) {
   return `<div class="cal-event-badge ${EVT_CLASSES[e.event_type]||'evt-special'}" title="${e.description||''}">${e.title}</div>`;
 }
 
+// Shift color varies by employee type so mixed Front Desk / Trainer / Pilates shifts read apart at a glance.
+const ROLE_COLORS = {
+  frontdesk: { bg: 'var(--green-pale)', fg: 'var(--green)' },
+  trainer:   { bg: '#eef2ff',           fg: '#4338ca' },
+  pilates:   { bg: '#fdf2f8',           fg: '#be185d' },
+};
+function roleColor(role) { return ROLE_COLORS[role] || { bg: 'var(--cream-dark)', fg: 'var(--text-muted)' }; }
+
 function shiftChip(s) {
   const firstName = s.first_name || s.name.split(' ')[0];
-  return `<div style="font-size:11px;padding:4px 6px;background:var(--green-pale);border-radius:4px;color:var(--green);font-weight:600;display:flex;justify-content:space-between;gap:4px;">
+  const c = roleColor(s.role);
+  return `<div style="font-size:11px;padding:4px 6px;background:${c.bg};border-radius:4px;color:${c.fg};font-weight:600;display:flex;justify-content:space-between;gap:4px;">
     <span>${firstName}</span><span style="font-weight:400;">${s.start_time}–${s.end_time}</span>
   </div>`;
 }
@@ -1092,7 +1137,7 @@ function renderWeekView(fromS, todayS, evts, shifts) {
   const cols = days.map(({d, s}) => {
     const isToday = s === todayS;
     const dayEvts = eventsOnDate(evts, s);
-    const dayShifts = shiftsOnDate(shifts, s).filter(sh => sh.role === 'frontdesk');
+    const dayShifts = shiftsOnDate(shifts, s);
     const myEntry = cachedMyEntries.find(e => e.date === s);
 
     const badgesHtml = dayEvts.map(e => eventBadge(e)).join('');
@@ -1126,7 +1171,7 @@ function renderDayView(dateS, todayS, evts, shifts) {
   const content = document.getElementById('cal-content');
   const entry = cachedMyEntries.find(e => e.date === dateS);
   const dayEvts = eventsOnDate(evts, dateS);
-  const dayShifts = shiftsOnDate(shifts, dateS).filter(s => s.role === 'frontdesk');
+  const dayShifts = shiftsOnDate(shifts, dateS);
 
   const START_H = 7, END_H = 21, PX = 60; // 60px per hour
   const START_MIN = START_H * 60;
@@ -1167,17 +1212,35 @@ function renderDayView(dateS, todayS, evts, shifts) {
     }
   }
 
-  // Shift blocks
-  const shiftBlocksHtml = dayShifts.map(s => {
+  // Shift blocks — different employee types (Front Desk / Trainer / Pilates) can now overlap
+  // in time, so lay concurrent shifts out in side-by-side columns instead of stacking them.
+  const shiftCols = []; // tracks the end time of the shift currently occupying each column
+  const shiftLayout = [...dayShifts]
+    .sort((a, b) => timeToMin(a.start_time) - timeToMin(b.start_time))
+    .map(s => {
+      const startMin = timeToMin(s.start_time), endMin = timeToMin(s.end_time);
+      let col = shiftCols.findIndex(endTime => endTime <= startMin);
+      if (col === -1) { col = shiftCols.length; shiftCols.push(endMin); }
+      else shiftCols[col] = endMin;
+      return { s, col };
+    });
+  const totalCols = shiftCols.length || 1;
+  const shiftBlocksHtml = shiftLayout.map(({ s, col }) => {
     const startMin = timeToMin(s.start_time);
     const endMin   = timeToMin(s.end_time);
     const top    = (startMin - START_MIN) * (PX/60);
     const height = Math.max((endMin - startMin) * (PX/60), 28);
     const name = s.first_name || s.name;
     const showDetail = height >= 44;
-    return `<div class="day-tl-shift" style="top:${top}px;height:${height}px;" title="${name} · ${s.start_time}–${s.end_time}">
-      <div class="day-tl-shift-name">${name}</div>
-      ${showDetail ? `<div class="day-tl-shift-role">Front Desk</div>
+    const c = roleColor(s.role);
+    const leftPct = (col / totalCols) * 100;
+    const widthPct = 100 / totalCols;
+    const posStyle = totalCols > 1
+      ? `left:calc(${leftPct}% + 6px);width:calc(${widthPct}% - 8px);right:auto;`
+      : `left:10px;right:10px;`;
+    return `<div class="day-tl-shift" style="top:${top}px;height:${height}px;${posStyle}background:${c.bg};border-left-color:${c.fg};" title="${name} · ${t('roles')[s.role]||s.role} · ${s.start_time}–${s.end_time}">
+      <div class="day-tl-shift-name" style="color:${c.fg};">${name}</div>
+      ${showDetail ? `<div class="day-tl-shift-role">${t('roles')[s.role]||s.role}</div>
       <div class="day-tl-shift-time">${s.start_time} – ${s.end_time}</div>` : ''}
     </div>`;
   }).join('');
@@ -1388,9 +1451,8 @@ async function populateShiftEmpSelect(selectedId) {
     const data = await api('GET', '/admin/users');
     cachedAdminUsers = data || [];
   }
-  const frontdesk = cachedAdminUsers.filter(u => u.role === 'frontdesk');
   const sel = document.getElementById('shift-emp-select');
-  sel.innerHTML = frontdesk.map(u => `<option value="${u.id}" ${String(u.id)===String(selectedId)?'selected':''}>${u.first_name || u.name.split(' ')[0]} ${u.last_name||''}</option>`).join('');
+  sel.innerHTML = cachedAdminUsers.map(u => `<option value="${u.id}" ${String(u.id)===String(selectedId)?'selected':''}>${u.first_name || u.name.split(' ')[0]} ${u.last_name||''} — ${t('roles')[u.role]||u.role}</option>`).join('');
 }
 
 async function openAddShift(prefillDate) {
@@ -1575,9 +1637,12 @@ function showTab(tab) {
   ['calendar','my-time','my-summary','my-profile','admin-overview','admin-employee','admin-summary','admin-manage','admin-events','admin-shifts'].forEach(v => {
     const el = document.getElementById('view-' + v); if (el) el.style.display = 'none';
   });
+  const isAdminUser = currentUser && currentUser.role === 'admin';
   const tabMap = {
-    'calendar': currentUser && currentUser.role === 'admin' ? 'tab-calendar-adm' : 'tab-calendar-emp',
-    'my-time':'tab-mytime','my-summary':'tab-mysummary','my-profile':'tab-myprofile',
+    'calendar': isAdminUser ? 'tab-calendar-adm' : 'tab-calendar-emp',
+    'my-time': isAdminUser ? 'tab-mytime-adm' : 'tab-mytime',
+    'my-summary': isAdminUser ? 'tab-mysummary-adm' : 'tab-mysummary',
+    'my-profile': isAdminUser ? 'tab-myprofile-adm' : 'tab-myprofile',
     'admin-overview':'tab-overview','admin-employee':'tab-empdetail',
     'admin-summary':'tab-adminsum','admin-manage':'tab-manage','admin-events':'tab-events',
     'admin-shifts':'tab-shifts'
@@ -1611,7 +1676,7 @@ async function renderMyTime() {
   }
   const allEntries = cachedMyEntries;
   const months = getUniqueMonths(allEntries);
-  const cur = today().slice(0, 7);
+  const cur = getMonthKey(today());
   if (!mySelectedMonth) mySelectedMonth = months.includes(cur) ? cur : (months[0] || cur);
 
   const nav = document.getElementById('my-month-nav');
@@ -1657,7 +1722,7 @@ async function renderMySummary() {
   const prev = sel.value;
   sel.innerHTML = months.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
   if (prev && months.includes(prev)) sel.value = prev;
-  const selectedMk = sel.value || (months[0] || today().slice(0,7));
+  const selectedMk = sel.value || (months[0] || getMonthKey(today()));
   const entries = allEntries.filter(e => getMonthKey(e.date) === selectedMk).sort((a,b) => a.date.localeCompare(b.date));
   const stats = calcStats(entries);
   document.getElementById('my-summary-sub').textContent = `${currentUser.name} — ${monthLabel(selectedMk)}`;
@@ -1703,11 +1768,15 @@ async function addEntry() {
   renderMyTime();
 }
 
+// Whose entry this is (own vs. another employee's) determines which API route to use —
+// an admin now has their own entries too (via My Timesheet), so role alone can't decide this.
+function findCachedEntry(entryId) {
+  return cachedMyEntries.find(e => e.id === entryId)
+    || Object.values(cachedAdminEntries).flat().find(e => e.id === entryId);
+}
+
 function openEdit(entryId) {
-  const isAdmin = currentUser.role === 'admin';
-  const entry = isAdmin
-    ? Object.values(cachedAdminEntries).flat().find(e => e.id === entryId)
-    : cachedMyEntries.find(e => e.id === entryId);
+  const entry = findCachedEntry(entryId);
   if (!entry) return;
   document.getElementById('edit-entry-id').value = entryId;
   document.getElementById('edit-date').value = entry.date;
@@ -1728,20 +1797,21 @@ async function saveEdit() {
   if (endMin <= startMin) { errEl.textContent = t('errDates'); errEl.style.display = ''; return; }
   const duration = endMin - startMin;
 
-  const isAdmin = currentUser.role === 'admin';
-  const path = isAdmin ? `/admin/entries/${id}` : `/entries/${id}`;
+  const entry = findCachedEntry(parseInt(id));
+  const isMine = entry && entry.user_id === currentUser.id;
+  const path = isMine ? `/entries/${id}` : `/admin/entries/${id}`;
   const res = await api('PUT', path, { date, start_time: start, end_time: end, duration });
   if (!res || res.error) { errEl.textContent = res ? res.error : 'Error'; errEl.style.display = ''; return; }
 
-  if (isAdmin) {
+  if (isMine) {
+    const idx = cachedMyEntries.findIndex(e => e.id === parseInt(id));
+    if (idx >= 0) cachedMyEntries[idx] = res;
+    mySelectedMonth = getMonthKey(date);
+  } else {
     for (const uid in cachedAdminEntries) {
       const idx = cachedAdminEntries[uid].findIndex(e => e.id === parseInt(id));
       if (idx >= 0) { cachedAdminEntries[uid][idx] = res; break; }
     }
-  } else {
-    const idx = cachedMyEntries.findIndex(e => e.id === parseInt(id));
-    if (idx >= 0) cachedMyEntries[idx] = res;
-    mySelectedMonth = getMonthKey(date);
   }
   closeModal();
   showToast(t('toastSaved'));
@@ -1754,16 +1824,12 @@ function openDelete(entryId) {
 }
 
 async function confirmDelete() {
-  const id = document.getElementById('delete-entry-id').value;
+  const id = parseInt(document.getElementById('delete-entry-id').value);
   const res = await api('DELETE', `/entries/${id}`);
   if (!res) return;
-  const isAdmin = currentUser.role === 'admin';
-  if (isAdmin) {
-    for (const uid in cachedAdminEntries) {
-      cachedAdminEntries[uid] = cachedAdminEntries[uid].filter(e => e.id !== parseInt(id));
-    }
-  } else {
-    cachedMyEntries = cachedMyEntries.filter(e => e.id !== parseInt(id));
+  cachedMyEntries = cachedMyEntries.filter(e => e.id !== id);
+  for (const uid in cachedAdminEntries) {
+    cachedAdminEntries[uid] = cachedAdminEntries[uid].filter(e => e.id !== id);
   }
   closeModal();
   showToast(t('toastDeleted'));
@@ -1788,7 +1854,7 @@ async function renderAdminOverview() {
 
   const allEntries = Object.values(cachedAdminEntries).flat();
   const months = getUniqueMonths(allEntries);
-  const cur = today().slice(0, 7);
+  const cur = getMonthKey(today());
   if (!adminSelectedMonth) adminSelectedMonth = months.includes(cur) ? cur : (months[0] || cur);
 
   const nav = document.getElementById('admin-month-nav');
@@ -1856,7 +1922,7 @@ async function renderAdminEmployeeDetail() {
   }
   const allEntries = cachedAdminEntries[userId];
   const months = getUniqueMonths(allEntries);
-  const cur = today().slice(0,7);
+  const cur = getMonthKey(today());
   if (!adminEmpSelectedMonth || !months.includes(adminEmpSelectedMonth)) {
     adminEmpSelectedMonth = months.includes(cur) ? cur : (months[0] || cur);
   }
@@ -1911,7 +1977,7 @@ async function renderAdminSummary() {
   const prev = sel.value;
   sel.innerHTML = months.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
   if (prev && months.includes(prev)) sel.value = prev;
-  const selectedMk = sel.value || (months[0] || today().slice(0,7));
+  const selectedMk = sel.value || (months[0] || getMonthKey(today()));
 
   const rows = cachedAdminUsers.map(u => {
     const entries = (cachedAdminEntries[u.id] || []).filter(e => getMonthKey(e.date) === selectedMk).sort((a,b) => a.date.localeCompare(b.date));
@@ -2018,7 +2084,7 @@ function showEuForm(user) {
     : (lang === 'nl' ? 'Wachtwoord instellen' : 'Set Password');
   document.getElementById('eu-pass-label').textContent = isEdit
     ? (lang === 'nl' ? 'Nieuw wachtwoord (leeg = ongewijzigd)' : 'New password (leave blank to keep current)')
-    : (lang === 'nl' ? 'Wachtwoord *' : 'Password *');
+    : (lang === 'nl' ? 'Wachtwoord (optioneel — inloggen gaat via Google)' : 'Password (optional — sign-in is via Google)');
 
   document.getElementById('manage-list').style.display = 'none';
   document.getElementById('manage-edit-form').style.display = '';
@@ -2056,9 +2122,12 @@ async function saveUserEdit() {
   if (!euUserId) {
     const pass    = document.getElementById('eu-pass').value;
     const confirm = document.getElementById('eu-pass-confirm').value;
-    if (pass.length < 6) { errEl.textContent = lang === 'nl' ? 'Wachtwoord minimaal 6 tekens.' : 'Password must be at least 6 characters.'; errEl.style.display = ''; return; }
-    if (pass !== confirm) { errEl.textContent = lang === 'nl' ? 'Wachtwoorden komen niet overeen.' : 'Passwords do not match.'; errEl.style.display = ''; return; }
-    body.password = pass;
+    // Password is optional now that employees sign in with Google — only validate it if one was entered.
+    if (pass || confirm) {
+      if (pass.length < 6) { errEl.textContent = lang === 'nl' ? 'Wachtwoord minimaal 6 tekens.' : 'Password must be at least 6 characters.'; errEl.style.display = ''; return; }
+      if (pass !== confirm) { errEl.textContent = lang === 'nl' ? 'Wachtwoorden komen niet overeen.' : 'Passwords do not match.'; errEl.style.display = ''; return; }
+      body.password = pass;
+    }
   }
 
   const res = await api(euUserId ? 'PUT' : 'POST', euUserId ? `/admin/users/${euUserId}` : '/admin/users', body);
