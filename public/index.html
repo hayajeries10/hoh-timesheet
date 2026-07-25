@@ -907,7 +907,7 @@ const GOOGLE_CLIENT_ID = 'PASTE_YOUR_GOOGLE_CLIENT_ID_HERE';
 function initGoogleSignIn() {
   if (typeof google === 'undefined' || !GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('PASTE_YOUR')) {
     document.getElementById('btn-google-signin').style.display = 'none';
-    document.getElementById('auth-email-section').style.display = '';
+    document.getElementById('auth-email-section').style.display = 'block';
     document.querySelector('.auth-email-toggle').style.display = 'none';
     document.querySelector('.auth-divider').style.display = 'none';
     return;
