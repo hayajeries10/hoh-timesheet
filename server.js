@@ -390,8 +390,11 @@ app.delete('/api/entries/:id', auth, async (req, res) => {
 // ── ADMIN ROUTES ─────────────────────────────────────────
 app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   try {
+    // Excludes only the requesting admin themself, so other admins (including newly
+    // promoted ones) stay visible and manageable here — e.g. to demote them later.
     const { rows } = await pool.query(
-      "SELECT id, name, first_name, last_name, email, role, birthdate, picture, TO_CHAR(created_at, 'YYYY-MM-DD') as created_at FROM users WHERE role != 'admin' ORDER BY name"
+      "SELECT id, name, first_name, last_name, email, role, birthdate, picture, TO_CHAR(created_at, 'YYYY-MM-DD') as created_at FROM users WHERE id != $1 ORDER BY name",
+      [req.user.id]
     );
     res.json(rows);
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
