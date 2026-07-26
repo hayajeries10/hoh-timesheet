@@ -35,7 +35,11 @@
     --mono: 'DM Mono', monospace;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: var(--font); background: var(--cream); color: var(--text); min-height: 100vh; font-size: 15px; line-height: 1.6; }
+  /* Some mobile browsers (notably iOS Safari on <input type="date">) render a native
+     control wider than its CSS box. Without this, that one element can drag the whole
+     page into horizontal scroll — this is the page-wide safety net against that. */
+  html, body { overflow-x: hidden; }
+  body { font-family: var(--font); background: var(--cream); color: var(--text); min-height: 100vh; font-size: 15px; line-height: 1.6; width: 100%; }
 
   /* ── AUTH PAGE ── */
   #page-auth { min-height: 100vh; display: none; flex-direction: column; align-items: center; justify-content: center; background: #313131; padding: 2rem; }
@@ -51,7 +55,8 @@
   .lang-btn.active { background: var(--white); color: var(--green); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
   .form-group { margin-bottom: 1rem; }
   .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
-  .form-group input, .form-group select { width: 100%; padding: 10px 14px; border: 1.5px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 15px; font-family: var(--font); color: var(--text); background: var(--white); outline: none; transition: border-color 0.15s; }
+  .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group input, .form-group select { width: 100%; max-width: 100%; padding: 10px 14px; border: 1.5px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 15px; font-family: var(--font); color: var(--text); background: var(--white); outline: none; transition: border-color 0.15s; }
   .form-group input:focus, .form-group select:focus { border-color: var(--green-light); }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 20px; border-radius: var(--radius-sm); font-family: var(--font); font-size: 15px; font-weight: 500; cursor: pointer; transition: all 0.15s; border: none; text-decoration: none; }
   .btn-primary { background: var(--green); color: var(--white); width: 100%; }
@@ -177,6 +182,10 @@
     .entry-form { grid-template-columns: 1fr; }
     .entry-form .btn { width: 100%; }
     .export-btns { flex-wrap: wrap; }
+    /* iOS renders date/time inputs with extra internal padding around the segments —
+       trim ours so the control has room to actually fit at phone widths. */
+    input[type="date"], input[type="time"] { padding-left: 8px; padding-right: 8px; font-size: 14px; }
+    .form-grid-2 { grid-template-columns: 1fr; }
   }
 
   /* ── TOAST ── */
@@ -524,7 +533,7 @@
           <span style="font-size:12px;color:var(--text-muted);" id="lbl-clickphoto">Click photo to change</span>
           <input type="file" id="profile-pic-input" accept="image/*" style="display:none;" onchange="handleProfilePic(this)">
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-grid-2">
           <div class="form-group" style="margin:0;"><label id="lbl-firstname">First name</label><input type="text" id="profile-firstname" placeholder="First name"></div>
           <div class="form-group" style="margin:0;"><label id="lbl-lastname">Last name</label><input type="text" id="profile-lastname" placeholder="Last name"></div>
         </div>
@@ -571,7 +580,7 @@
             <input type="file" id="eu-pic-input" accept="image/*" style="display:none;" onchange="handleEuPic(this)">
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-grid-2">
             <div class="form-group" style="margin:0;"><label>First name *</label><input type="text" id="eu-firstname" placeholder="First name"></div>
             <div class="form-group" style="margin:0;"><label>Last name</label><input type="text" id="eu-lastname" placeholder="Last name"></div>
           </div>
@@ -702,7 +711,7 @@
       <select id="shift-emp-select"></select>
     </div>
     <div class="form-group"><label>Date *</label><input type="date" id="shift-date"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <div class="form-grid-2">
       <div class="form-group" style="margin:0;"><label>Start time *</label><input type="time" id="shift-start"></div>
       <div class="form-group" style="margin:0;"><label>End time *</label><input type="time" id="shift-end"></div>
     </div>
