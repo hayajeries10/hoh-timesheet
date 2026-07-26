@@ -2308,12 +2308,19 @@ window.addEventListener('load', () => setTimeout(initGoogleSignIn, 200));
 // Resume session
 const token = localStorage.getItem('hoh_token');
 if (token) {
-  api('POST', '/auth/login', null).catch(() => {});
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     if (payload.exp * 1000 > Date.now()) {
+      // The token only carries a few basic fields — fetch the full profile (name parts,
+      // birthdate, photo) so a page refresh doesn't make already-saved data look blank.
       currentUser = { id: payload.id, name: payload.name, email: payload.email, role: payload.role, is_admin: payload.is_admin };
       enterApp();
+      api('GET', '/profile').then(full => {
+        if (!full || full.error) return;
+        currentUser = { ...currentUser, ...full };
+        document.getElementById('topbar-username').textContent = currentUser.name;
+        if (activeTab === 'my-profile') renderMyProfile();
+      });
     } else {
       localStorage.removeItem('hoh_token');
     }
