@@ -169,7 +169,9 @@
 
   /* ── MOBILE ── */
   @media (max-width: 500px) {
-    .topbar { padding: 0 1rem; }
+    .topbar { flex-wrap: wrap; height: auto; padding: 10px 1rem; row-gap: 8px; }
+    .topbar-user { display: none; }
+    .topbar-btn span { display: none; }
     .app-content { padding: 1rem; }
     .tabs { flex-wrap: wrap; }
     .entry-form { grid-template-columns: 1fr; }
@@ -427,6 +429,12 @@
     <div id="view-my-time">
       <div class="stats-row" id="my-stats-row"></div>
       <div class="card" style="margin-bottom:1rem;">
+        <div class="card-header">
+          <div><div class="card-title" id="lbl-entries">Time entries</div><div class="card-subtitle" id="my-month-label"></div></div>
+          <div class="month-nav" id="my-month-nav"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:1rem;">
         <div class="card-header"><div class="card-title" id="lbl-addentry">Add Entry</div></div>
         <div class="entry-form">
           <div class="form-group" style="margin:0;"><label id="lbl-date">Date</label><input type="date" id="entry-date"></div>
@@ -436,10 +444,6 @@
         </div>
       </div>
       <div class="card">
-        <div class="card-header">
-          <div><div class="card-title" id="lbl-entries">Time entries</div><div class="card-subtitle" id="my-month-label"></div></div>
-          <div class="month-nav" id="my-month-nav"></div>
-        </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th id="th-date">Date</th><th id="th-day">Day</th><th id="th-start">Start</th><th id="th-end">End</th><th id="th-duration">Duration</th><th></th></tr></thead>
