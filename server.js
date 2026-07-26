@@ -80,8 +80,13 @@ async function setupDatabase() {
       end_time TEXT NOT NULL,
       notes TEXT DEFAULT '',
       created_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE(user_id, shift_date)
+      UNIQUE(user_id, shift_date, start_time)
     );
+    -- Front desk staff can have both a morning and evening shift on the same
+    -- day, so the old one-shift-per-day constraint has to go.
+    ALTER TABLE shifts DROP CONSTRAINT IF EXISTS shifts_user_id_shift_date_key;
+    ALTER TABLE shifts DROP CONSTRAINT IF EXISTS shifts_user_id_shift_date_start_time_key;
+    ALTER TABLE shifts ADD CONSTRAINT shifts_user_id_shift_date_start_time_key UNIQUE (user_id, shift_date, start_time);
   `);
 }
 
@@ -515,7 +520,7 @@ app.post('/api/shifts', auth, adminOnly, async (req, res) => {
     const { user_id, shift_date, start_time, end_time, notes } = req.body;
     if (!user_id || !shift_date || !start_time || !end_time) return res.status(400).json({ error: 'Missing fields' });
     const { rows } = await pool.query(
-      'INSERT INTO shifts (user_id, shift_date, start_time, end_time, notes) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (user_id, shift_date) DO UPDATE SET start_time=$3, end_time=$4, notes=$5 RETURNING *',
+      'INSERT INTO shifts (user_id, shift_date, start_time, end_time, notes) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (user_id, shift_date, start_time) DO UPDATE SET end_time=$4, notes=$5 RETURNING *',
       [user_id, shift_date, start_time, end_time, notes || '']
     );
     res.json(rows[0]);
@@ -605,116 +610,11 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ── SEED SHIFTS (week of 11–17 May 2026) ─────────────────
-// Schedule read from color-coded Google Sheet (confirmed by admin):
-//   Mon: Haya morning, Elmira evening
-//   Tue: Charlotte morning, Caitilin evening
-//   Wed: Haya morning, Elmira evening
-//   Thu: Elmira morning, Caitilin evening
-//   Fri: Elmira morning, Caitilin evening
-//   Sat: Caitilin morning only
-//   Sun: Elmira morning
-async function seedShifts() {
-  const { rows: existing } = await pool.query('SELECT COUNT(*) as c FROM shifts');
-  if (parseInt(existing[0].c) > 0) return;
-
-  const getUser = async (name) => {
-    const r = await pool.query('SELECT id FROM users WHERE name = $1', [name]);
-    return r.rows[0]?.id;
-  };
-
-  const upsert = async (userId, date, start, end) => {
-    if (!userId) return;
-    await pool.query(
-      'INSERT INTO shifts (user_id, shift_date, start_time, end_time) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id, shift_date) DO UPDATE SET start_time=$3, end_time=$4',
-      [userId, date, start, end]
-    );
-  };
-
-  const [haya, caitilin, elmira, charlotte] = await Promise.all([
-    getUser('Haya'), getUser('Caitilin'), getUser('Elmira'), getUser('Charlotte'),
-  ]);
-
-  for (const [uid, date, s, e] of [
-    [haya,      '2026-05-11', '07:45', '13:00'],  // Mon morning
-    [elmira,    '2026-05-11', '16:30', '20:30'],  // Mon evening
-    [charlotte, '2026-05-12', '07:45', '13:00'],  // Tue morning
-    [caitilin,  '2026-05-12', '16:30', '21:15'],  // Tue evening
-    [haya,      '2026-05-13', '07:45', '13:00'],  // Wed morning
-    [elmira,    '2026-05-13', '16:30', '20:15'],  // Wed evening
-    [elmira,    '2026-05-14', '07:45', '13:00'],  // Thu morning
-    [caitilin,  '2026-05-14', '16:30', '21:15'],  // Thu evening
-    [elmira,    '2026-05-15', '07:45', '13:00'],  // Fri morning
-    [caitilin,  '2026-05-15', '16:30', '19:30'],  // Fri evening
-    [caitilin,  '2026-05-16', '07:45', '12:30'],  // Sat morning (Caitilin only)
-    [elmira,    '2026-05-17', '07:45', '11:30'],  // Sun morning
-  ]) await upsert(uid, date, s, e);
-
-  console.log('Shifts seeded for week 11–17 May 2026.');
-}
-
-// ── FIX SHIFTS (live DB correction — idempotent) ──────────
-// Replaces all 11–17 May shifts with the confirmed correct schedule.
-async function fixShiftsWeekMay11() {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    const getUser = async (name) => {
-      const r = await client.query('SELECT id FROM users WHERE name = $1', [name]);
-      return r.rows[0]?.id;
-    };
-
-    // Ensure Charlotte exists (new employee)
-    const empHash = bcrypt.hashSync('habits2026', 10);
-    await client.query(
-      "INSERT INTO users (name, first_name, email, password, role) VALUES ('Charlotte','Charlotte','charlotte@houseofhabits.nl',$1,'frontdesk') ON CONFLICT (email) DO NOTHING",
-      [empHash]
-    );
-
-    const [haya, caitilin, elmira, charlotte] = await Promise.all([
-      getUser('Haya'), getUser('Caitilin'), getUser('Elmira'), getUser('Charlotte'),
-    ]);
-    if (!haya || !caitilin || !elmira || !charlotte) { await client.query('ROLLBACK'); return; }
-
-    // Wipe the entire week and re-insert correctly
-    await client.query("DELETE FROM shifts WHERE shift_date BETWEEN '2026-05-11' AND '2026-05-17'");
-
-    const ins = async (uid, date, s, e) => client.query(
-      'INSERT INTO shifts (user_id, shift_date, start_time, end_time) VALUES ($1,$2,$3,$4)',
-      [uid, date, s, e]
-    );
-
-    await ins(haya,      '2026-05-11', '07:45', '13:00');  // Mon morning
-    await ins(elmira,    '2026-05-11', '16:30', '20:30');  // Mon evening
-    await ins(charlotte, '2026-05-12', '07:45', '13:00');  // Tue morning
-    await ins(caitilin,  '2026-05-12', '16:30', '21:15');  // Tue evening
-    await ins(haya,      '2026-05-13', '07:45', '13:00');  // Wed morning
-    await ins(elmira,    '2026-05-13', '16:30', '20:15');  // Wed evening
-    await ins(elmira,    '2026-05-14', '07:45', '13:00');  // Thu morning
-    await ins(caitilin,  '2026-05-14', '16:30', '21:15');  // Thu evening
-    await ins(elmira,    '2026-05-15', '07:45', '13:00');  // Fri morning
-    await ins(caitilin,  '2026-05-15', '16:30', '19:30');  // Fri evening
-    await ins(caitilin,  '2026-05-16', '07:45', '12:30');  // Sat morning only
-    await ins(elmira,    '2026-05-17', '07:45', '11:30');  // Sun morning
-
-    await client.query('COMMIT');
-    console.log('Shift data for week 11–17 May 2026 corrected.');
-  } catch (e) {
-    await client.query('ROLLBACK');
-    console.error('Error fixing shifts:', e.message);
-  } finally {
-    client.release();
-  }
-}
-
 // ── START ────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🏠 House of Habits Timesheet running at http://localhost:${PORT}\n`);
   setupDatabase()
     .then(() => seedDatabase())
-    .then(() => seedShifts())
-    .then(() => fixShiftsWeekMay11())
     .then(() => {
       console.log('   Admin:    hayajeries10@gmail.com / HoH@Admin2026');
       console.log('   Employees default password: habits2026\n');
