@@ -1575,7 +1575,6 @@ async function saveProfile() {
   const birthdate  = document.getElementById('profile-birthdate').value;
   const errEl = document.getElementById('profile-save-error');
   errEl.style.display = 'none';
-  if (!first_name) { errEl.textContent = lang === 'nl' ? 'Voornaam is verplicht.' : 'First name is required.'; errEl.style.display = ''; return; }
   const res = await api('PUT', '/profile', { first_name, last_name, birthdate, picture: currentUser.picture || '' });
   if (!res || res.error) { errEl.textContent = res ? res.error : 'Error.'; errEl.style.display = ''; return; }
   currentUser.first_name = first_name;
