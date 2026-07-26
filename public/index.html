@@ -160,6 +160,7 @@
   .badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 500; }
   .badge-green { background: var(--green-pale); color: var(--green); }
   .badge-gray { background: var(--cream-dark); color: var(--text-muted); }
+  .badge-amber { background: #fef3c7; color: #92400e; }
 
   /* ── ADMIN EMP SELECT ── */
   .admin-emp-select { display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem; flex-wrap: wrap; }
@@ -592,8 +593,14 @@
               <option value="trainer">Trainer</option>
               <option value="pilates">Pilates</option>
               <option value="employee">Employee</option>
-              <option value="admin">Admin</option>
             </select>
+          </div>
+          <div class="form-group" style="background:var(--green-pale);border-radius:var(--radius-sm);padding:10px 12px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0;">
+              <input type="checkbox" id="eu-is-admin" style="width:auto;">
+              <span>Grant Admin access</span>
+            </label>
+            <p style="font-size:12px;color:var(--text-muted);margin-top:4px;margin-left:24px;">Admin is separate from their role above — e.g. someone can be Front Desk <em>and</em> Admin. Lets them edit shifts &amp; events, and view everyone's hours.</p>
           </div>
           <div id="eu-error" class="error-msg" style="display:none;margin-bottom:10px;"></div>
           <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;">
@@ -654,6 +661,18 @@
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal()">Cancel</button>
       <button class="btn btn-danger btn-sm" onclick="confirmDeleteUser()">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- GRANT ADMIN CONFIRM MODAL -->
+<div class="modal-overlay" id="grant-admin-modal">
+  <div class="modal">
+    <div class="modal-title">Grant Admin access?</div>
+    <p style="font-size:14px;color:var(--text-muted);" id="grant-admin-text">This gives them full admin rights: editing shifts and events, and viewing everyone's hours.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="cancelGrantAdmin()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmGrantAdmin()">Grant Admin</button>
     </div>
   </div>
 </div>
@@ -789,7 +808,7 @@ const T = {
     toastPassChanged: 'Password updated!',
     emptyEntries: 'No entries yet for this period.',
     emptyEntriesSub: 'Add your first entry above.',
-    roles: { employee: 'Employee', trainer: 'Trainer', frontdesk: 'Front Desk', pilates: 'Pilates', admin: 'Admin' },
+    roles: { employee: 'Employee', trainer: 'Trainer', frontdesk: 'Front Desk', pilates: 'Pilates' },
     days: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
     totalHoursLabel: 'Total hours worked',
@@ -827,7 +846,7 @@ const T = {
     toastPassChanged: 'Wachtwoord bijgewerkt!',
     emptyEntries: 'Nog geen invoer voor deze periode.',
     emptyEntriesSub: 'Voeg hierboven je eerste invoer toe.',
-    roles: { employee: 'Medewerker', trainer: 'Trainer', frontdesk: 'Balie', pilates: 'Pilates', admin: 'Beheerder' },
+    roles: { employee: 'Medewerker', trainer: 'Trainer', frontdesk: 'Balie', pilates: 'Pilates' },
     days: ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'],
     months: ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'],
     totalHoursLabel: 'Totaal gewerkte uren',
@@ -1011,7 +1030,7 @@ async function enterApp() {
   document.getElementById('page-app').classList.add('active');
   document.getElementById('topbar-username').textContent = currentUser.name;
 
-  const isAdmin = currentUser.role === 'admin';
+  const isAdmin = currentUser.is_admin;
   document.getElementById('employee-tabs').style.display = isAdmin ? 'none' : '';
   document.getElementById('admin-tabs').style.display = isAdmin ? '' : 'none';
   document.getElementById('btn-chgpass').style.display = isAdmin ? 'none' : '';
@@ -1093,7 +1112,7 @@ async function renderCalendar() {
   }
 
   // Ensure entries cached for employee
-  if (currentUser.role !== 'admin' && !cachedMyEntries.length) {
+  if (!currentUser.is_admin && !cachedMyEntries.length) {
     const d = await api('GET', '/entries');
     cachedMyEntries = d || [];
   }
@@ -1145,12 +1164,12 @@ function renderWeekView(fromS, todayS, evts, shifts) {
     const shiftsHtml = dayShifts.length
       ? `<div style="display:flex;flex-direction:column;gap:3px;margin-top:${dayEvts.length?'4px':'0'}">${dayShifts.map(s => shiftChip(s)).join('')}</div>`
       : '';
-    const myEntryHtml = myEntry && currentUser.role !== 'admin'
+    const myEntryHtml = myEntry && !currentUser.is_admin
       ? `<div style="margin-top:4px;padding:4px 6px;background:var(--cream-dark);border-radius:4px;font-size:11px;color:var(--text-muted);text-align:center;">Me: ${myEntry.start_time}–${myEntry.end_time}</div>`
       : '';
     const emptyHtml = !dayEvts.length && !dayShifts.length && !myEntry
       ? `<div style="font-size:11px;color:var(--text-light);text-align:center;padding:8px 0;">—</div>` : '';
-    const addShiftBtn = currentUser.role === 'admin'
+    const addShiftBtn = currentUser.is_admin
       ? `<div style="padding:4px 5px 0;"><button onclick="event.stopPropagation();openAddShift('${s}')" style="width:100%;font-size:10px;padding:3px;background:none;border:1px dashed var(--green-muted);border-radius:4px;color:var(--green-light);cursor:pointer;font-family:var(--font);">+ shift</button></div>`
       : '';
 
@@ -1248,7 +1267,7 @@ function renderDayView(dateS, todayS, evts, shifts) {
 
   // My logged hours block (non-admin)
   let myBlockHtml = '';
-  if (currentUser.role !== 'admin' && entry) {
+  if (!currentUser.is_admin && entry) {
     const startMin = timeToMin(entry.start_time);
     const endMin   = timeToMin(entry.end_time);
     const top    = (startMin - START_MIN) * (PX/60);
@@ -1260,7 +1279,7 @@ function renderDayView(dateS, todayS, evts, shifts) {
   }
 
   // Admin add-shift button
-  const addBtnHtml = currentUser.role === 'admin'
+  const addBtnHtml = currentUser.is_admin
     ? `<div class="day-tl-addbtn"><button onclick="openAddShift('${dateS}')">+ Add shift</button></div>`
     : '';
 
@@ -1638,7 +1657,7 @@ function showTab(tab) {
   ['calendar','my-time','my-summary','my-profile','admin-overview','admin-employee','admin-summary','admin-manage','admin-events','admin-shifts'].forEach(v => {
     const el = document.getElementById('view-' + v); if (el) el.style.display = 'none';
   });
-  const isAdminUser = currentUser && currentUser.role === 'admin';
+  const isAdminUser = currentUser && currentUser.is_admin;
   const tabMap = {
     'calendar': isAdminUser ? 'tab-calendar-adm' : 'tab-calendar-emp',
     'my-time': isAdminUser ? 'tab-mytime-adm' : 'tab-mytime',
@@ -2027,7 +2046,7 @@ async function renderAdminManage() {
     return `<tr>
       <td><div style="display:flex;align-items:center;">${avatarHtml}<div><div style="font-weight:600;">${u.name}</div>${u.birthdate ? `<div style="font-size:12px;color:var(--text-muted);">🎂 ${u.birthdate}</div>` : ''}</div></div></td>
       <td style="color:var(--text-muted);font-size:13px;">${u.email}</td>
-      <td><span class="badge badge-green">${t('roles')[u.role]||u.role}</span></td>
+      <td><span class="badge badge-green">${t('roles')[u.role]||u.role}</span>${u.is_admin ? ` <span class="badge badge-amber">Admin</span>` : ''}</td>
       <td style="color:var(--text-muted);font-size:13px;">${u.created_at}</td>
       <td><div class="td-actions">
         <button class="btn btn-outline btn-sm" onclick="openEditUser(${u.id})">✏️</button>
@@ -2039,6 +2058,8 @@ async function renderAdminManage() {
 
 let euUserId = '';
 let euPicture = '';
+let euOriginalIsAdmin = false;
+let pendingUserSaveBody = null;
 
 function handleEuPic(input) {
   if (!input.files[0]) return;
@@ -2072,6 +2093,8 @@ function showEuForm(user) {
   document.getElementById('eu-email').value     = user ? user.email : '';
   document.getElementById('eu-birthdate').value = user ? (user.birthdate  || '') : '';
   document.getElementById('eu-role').value      = user ? user.role : 'employee';
+  euOriginalIsAdmin = user ? !!user.is_admin : false;
+  document.getElementById('eu-is-admin').checked = euOriginalIsAdmin;
   document.getElementById('eu-pass').value      = '';
   document.getElementById('eu-pass-confirm').value = '';
   document.getElementById('eu-error').style.display = 'none';
@@ -2110,6 +2133,7 @@ async function saveUserEdit() {
   const email      = document.getElementById('eu-email').value.trim();
   const birthdate  = document.getElementById('eu-birthdate').value;
   const role       = document.getElementById('eu-role').value;
+  const isAdminChecked = document.getElementById('eu-is-admin').checked;
   const errEl      = document.getElementById('eu-error');
   errEl.style.display = 'none';
 
@@ -2118,7 +2142,7 @@ async function saveUserEdit() {
     errEl.style.display = ''; return;
   }
 
-  const body = { first_name, last_name, email, role, birthdate, picture: euPicture };
+  const body = { first_name, last_name, email, role, birthdate, picture: euPicture, is_admin: isAdminChecked };
 
   if (!euUserId) {
     const pass    = document.getElementById('eu-pass').value;
@@ -2131,6 +2155,36 @@ async function saveUserEdit() {
     }
   }
 
+  // Granting Admin (new user checked, or an existing non-admin being promoted) needs
+  // explicit confirmation before it actually takes effect.
+  if (isAdminChecked && !euOriginalIsAdmin) {
+    const displayName = first_name || email;
+    document.getElementById('grant-admin-text').textContent = lang === 'nl'
+      ? `Beheerderstoegang geven aan "${displayName}"? Ze kunnen dan diensten en evenementen bewerken, en ieders uren bekijken.`
+      : `Give "${displayName}" Admin access? They'll be able to edit shifts and events, and view everyone's hours.`;
+    pendingUserSaveBody = body;
+    document.getElementById('grant-admin-modal').classList.add('open');
+    return;
+  }
+
+  await performSaveUser(body);
+}
+
+function cancelGrantAdmin() {
+  document.getElementById('eu-is-admin').checked = euOriginalIsAdmin;
+  pendingUserSaveBody = null;
+  closeModal();
+}
+
+async function confirmGrantAdmin() {
+  closeModal();
+  const body = pendingUserSaveBody;
+  pendingUserSaveBody = null;
+  if (body) await performSaveUser(body);
+}
+
+async function performSaveUser(body) {
+  const errEl = document.getElementById('eu-error');
   const res = await api(euUserId ? 'PUT' : 'POST', euUserId ? `/admin/users/${euUserId}` : '/admin/users', body);
   if (!res || res.error) { errEl.textContent = res ? res.error : 'Error'; errEl.style.display = ''; return; }
 
@@ -2323,7 +2377,7 @@ if (token) {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     if (payload.exp * 1000 > Date.now()) {
-      currentUser = { id: payload.id, name: payload.name, email: payload.email, role: payload.role };
+      currentUser = { id: payload.id, name: payload.name, email: payload.email, role: payload.role, is_admin: payload.is_admin };
       enterApp();
     } else {
       localStorage.removeItem('hoh_token');

@@ -43,6 +43,10 @@ async function setupDatabase() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name  TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS birthdate  TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS picture    TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin   BOOLEAN NOT NULL DEFAULT FALSE;
+    -- Admin used to be a 4th "role" value; it's now a separate permission flag so someone
+    -- can be e.g. Front Desk AND Admin at the same time. Migrate any existing admin rows.
+    UPDATE users SET is_admin = TRUE, role = 'employee' WHERE role = 'admin';
     UPDATE users SET role='frontdesk' WHERE name IN ('Haya','Caitilin','Elmira','Sanne') AND role='employee';
     UPDATE users SET role='trainer'   WHERE name IN ('Arthur','Dani')                    AND role IN ('employee','trainer');
     UPDATE users SET role='pilates'   WHERE name IN ('Alba','Susana')                    AND role='employee';
@@ -91,8 +95,8 @@ async function seedDatabase() {
 
     const adminHash = bcrypt.hashSync('HoH@Admin2026', 10);
     await client.query(
-      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING',
-      ['Admin', 'hayajeries10@gmail.com', adminHash, 'admin']
+      'INSERT INTO users (name, email, password, role, is_admin) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO NOTHING',
+      ['Admin', 'hayajeries10@gmail.com', adminHash, 'employee', true]
     );
 
     const empHash = bcrypt.hashSync('habits2026', 10);
@@ -265,7 +269,7 @@ function auth(req, res, next) {
 }
 
 function adminOnly(req, res, next) {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Forbidden' });
   next();
 }
 
@@ -278,8 +282,8 @@ app.post('/api/auth/login', async (req, res) => {
     const user = rows[0];
     if (!user) return res.status(401).json({ error: 'No account found with this email.' });
     if (!bcrypt.compareSync(password, user.password)) return res.status(401).json({ error: 'Incorrect password.' });
-    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, user: { id: user.id, name: user.name, first_name: user.first_name, last_name: user.last_name, email: user.email, role: user.role, birthdate: user.birthdate, picture: user.picture } });
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: { id: user.id, name: user.name, first_name: user.first_name, last_name: user.last_name, email: user.email, role: user.role, is_admin: user.is_admin, birthdate: user.birthdate, picture: user.picture } });
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -302,8 +306,8 @@ app.post('/api/auth/google', async (req, res) => {
     if (!rows.length) return res.status(401).json({ error: 'No HoH account linked to this Google address.' });
 
     const user = rows[0];
-    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, user: { id: user.id, name: user.name, first_name: user.first_name, last_name: user.last_name, email: user.email, role: user.role, birthdate: user.birthdate, picture: user.picture } });
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: { id: user.id, name: user.name, first_name: user.first_name, last_name: user.last_name, email: user.email, role: user.role, is_admin: user.is_admin, birthdate: user.birthdate, picture: user.picture } });
   } catch (e) { console.error('Google auth error:', e); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -321,7 +325,7 @@ app.put('/api/auth/password', auth, async (req, res) => {
 
 app.get('/api/profile', auth, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT id, name, first_name, last_name, email, role, birthdate, picture FROM users WHERE id = $1', [req.user.id]);
+    const { rows } = await pool.query('SELECT id, name, first_name, last_name, email, role, is_admin, birthdate, picture FROM users WHERE id = $1', [req.user.id]);
     res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
 });
@@ -381,7 +385,7 @@ app.delete('/api/entries/:id', auth, async (req, res) => {
   try {
     const check = await pool.query('SELECT * FROM entries WHERE id = $1', [req.params.id]);
     if (!check.rows[0]) return res.status(404).json({ error: 'Not found' });
-    if (req.user.role !== 'admin' && check.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    if (!req.user.is_admin && check.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
     await pool.query('DELETE FROM entries WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
@@ -393,7 +397,7 @@ app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
     // Excludes only the requesting admin themself, so other admins (including newly
     // promoted ones) stay visible and manageable here — e.g. to demote them later.
     const { rows } = await pool.query(
-      "SELECT id, name, first_name, last_name, email, role, birthdate, picture, TO_CHAR(created_at, 'YYYY-MM-DD') as created_at FROM users WHERE id != $1 ORDER BY name",
+      "SELECT id, name, first_name, last_name, email, role, is_admin, birthdate, picture, TO_CHAR(created_at, 'YYYY-MM-DD') as created_at FROM users WHERE id != $1 ORDER BY name",
       [req.user.id]
     );
     res.json(rows);
@@ -402,14 +406,14 @@ app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
 
 app.post('/api/admin/users', auth, adminOnly, async (req, res) => {
   try {
-    const { first_name, last_name, email, password, role, birthdate, picture } = req.body;
+    const { first_name, last_name, email, password, role, birthdate, picture, is_admin } = req.body;
     if (!first_name || !email) return res.status(400).json({ error: 'Missing fields' });
     const name = [first_name, last_name].filter(Boolean).join(' ');
     // Employees sign in with Google — a password is only a fallback, so generate one if none was set.
     const hash = bcrypt.hashSync(password || crypto.randomBytes(24).toString('hex'), 10);
     const { rows } = await pool.query(
-      'INSERT INTO users (name, first_name, last_name, email, password, role, birthdate, picture) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, name, first_name, last_name, email, role',
-      [name, first_name, last_name || '', email.toLowerCase().trim(), hash, role || 'employee', birthdate || '', picture || '']
+      'INSERT INTO users (name, first_name, last_name, email, password, role, birthdate, picture, is_admin) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, name, first_name, last_name, email, role, is_admin',
+      [name, first_name, last_name || '', email.toLowerCase().trim(), hash, role || 'employee', birthdate || '', picture || '', !!is_admin]
     );
     res.json(rows[0]);
   } catch (e) {
@@ -420,7 +424,7 @@ app.post('/api/admin/users', auth, adminOnly, async (req, res) => {
 
 app.put('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
   try {
-    const { first_name, last_name, email, role, password, birthdate, picture } = req.body;
+    const { first_name, last_name, email, role, password, birthdate, picture, is_admin } = req.body;
     const existing = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
     if (!existing.rows[0]) return res.status(404).json({ error: 'Not found' });
     const u = existing.rows[0];
@@ -428,9 +432,10 @@ app.put('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
     const ln = last_name  !== undefined ? last_name  : u.last_name;
     const name = [fn, ln].filter(Boolean).join(' ') || u.name;
     const newPass = password ? bcrypt.hashSync(password, 10) : u.password;
+    const newIsAdmin = is_admin !== undefined ? !!is_admin : u.is_admin;
     await pool.query(
-      'UPDATE users SET name=$1, first_name=$2, last_name=$3, email=$4, role=$5, password=$6, birthdate=$7, picture=$8 WHERE id=$9',
-      [name, fn, ln, email ? email.toLowerCase().trim() : u.email, role || u.role, newPass, birthdate !== undefined ? birthdate : u.birthdate, picture !== undefined ? picture : u.picture, req.params.id]
+      'UPDATE users SET name=$1, first_name=$2, last_name=$3, email=$4, role=$5, password=$6, birthdate=$7, picture=$8, is_admin=$9 WHERE id=$10',
+      [name, fn, ln, email ? email.toLowerCase().trim() : u.email, role || u.role, newPass, birthdate !== undefined ? birthdate : u.birthdate, picture !== undefined ? picture : u.picture, newIsAdmin, req.params.id]
     );
     res.json({ ok: true });
   } catch (e) {
@@ -524,7 +529,7 @@ app.get('/api/events', auth, async (req, res) => {
     );
     // Attach birthday events from users
     const { rows: users } = await pool.query(
-      "SELECT name, first_name, birthdate FROM users WHERE birthdate IS NOT NULL AND birthdate != '' AND role != 'admin'"
+      "SELECT name, first_name, birthdate FROM users WHERE birthdate IS NOT NULL AND birthdate != ''"
     );
     const fromYear = parseInt(from.split('-')[0]);
     const toYear   = parseInt(to.split('-')[0]);
