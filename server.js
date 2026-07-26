@@ -23,7 +23,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
+// Default 100kb limit is too small for base64-encoded profile photos.
+app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (_, res) => res.json({ ok: true }));
@@ -544,7 +545,7 @@ app.get('/api/events', auth, async (req, res) => {
     );
     // Attach birthday events from users
     const { rows: users } = await pool.query(
-      "SELECT name, first_name, birthdate FROM users WHERE birthdate IS NOT NULL AND birthdate != ''"
+      "SELECT name, first_name, birthdate, picture FROM users WHERE birthdate IS NOT NULL AND birthdate != ''"
     );
     const fromYear = parseInt(from.split('-')[0]);
     const toYear   = parseInt(to.split('-')[0]);
@@ -555,7 +556,7 @@ app.get('/api/events', auth, async (req, res) => {
       const displayName = u.first_name || u.name;
       for (let y = fromYear; y <= toYear + 1; y++) {
         const d = `${y}-${mm}-${dd}`;
-        if (d >= from && d <= to) bdays.push({ id: `bday-${u.name}-${y}`, title: `${displayName}'s Birthday`, event_date: d, event_type: 'birthday', color: '#7c3aed', description: '' });
+        if (d >= from && d <= to) bdays.push({ id: `bday-${u.name}-${y}`, title: `${displayName}'s Birthday`, event_date: d, event_type: 'birthday', color: '#7c3aed', description: '', picture: u.picture || '' });
       }
     }
     const all = [...events, ...bdays].sort((a, b) => a.event_date.localeCompare(b.event_date));

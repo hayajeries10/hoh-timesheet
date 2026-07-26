@@ -347,10 +347,6 @@
         <button class="lang-btn active" onclick="setLang('en')">EN</button>
         <button class="lang-btn" onclick="setLang('nl')">NL</button>
       </div>
-      <button class="topbar-btn" onclick="openChangePassword()" id="btn-chgpass" style="display:none;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <span id="lbl-chgpass">Password</span>
-      </button>
       <button class="topbar-btn" onclick="doLogout()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
         <span id="btn-signout">Sign out</span>
@@ -537,15 +533,6 @@
         <div id="profile-save-error" class="error-msg" style="display:none;"></div>
         <button class="btn btn-primary" onclick="saveProfile()" id="btn-saveprofile">Save profile</button>
       </div>
-
-      <div class="card" style="margin-top:1rem;">
-        <div class="card-header"><div class="card-title" id="lbl-chgpasscard">Change Password</div></div>
-        <div class="form-group"><label id="lbl-curpass2">Current password</label><input type="password" id="prof-cur-pass" placeholder="••••••••"></div>
-        <div class="form-group"><label id="lbl-newpass2">New password</label><input type="password" id="prof-new-pass" placeholder="Min. 6 characters"></div>
-        <div class="form-group"><label id="lbl-confpass">Confirm new password</label><input type="password" id="prof-conf-pass" placeholder="Repeat new password"></div>
-        <div id="prof-pass-error" class="error-msg" style="display:none;"></div>
-        <button class="btn btn-primary" onclick="doChangePasswordProfile()" id="btn-savepass">Update password</button>
-      </div>
     </div>
 
     <!-- ADMIN MANAGE USERS -->
@@ -681,21 +668,6 @@
   </div>
 </div>
 
-<!-- CHANGE PASSWORD MODAL (quick access from topbar) -->
-<div class="modal-overlay" id="chgpass-modal">
-  <div class="modal">
-    <div class="modal-title" id="chgpass-title">Change Password</div>
-    <div class="form-group"><label id="lbl-curpass">Current password</label><input type="password" id="cur-pass" placeholder="••••••••"></div>
-    <div class="form-group"><label id="lbl-newpass">New password</label><input type="password" id="new-pass" placeholder="Min. 6 characters"></div>
-    <div class="form-group"><label id="lbl-confpass2">Confirm new password</label><input type="password" id="conf-pass" placeholder="Repeat new password"></div>
-    <div id="chgpass-error" class="error-msg" style="display:none;"></div>
-    <div class="modal-actions">
-      <button class="btn btn-outline btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="doChangePassword()" id="btn-dochange">Update password</button>
-    </div>
-  </div>
-</div>
-
 <!-- ADD/EDIT EVENT MODAL -->
 <div class="modal-overlay" id="event-modal">
   <div class="modal">
@@ -819,9 +791,6 @@ const T = {
     pdfTitle: 'Timesheet',
     errDates: 'End time must be after start time.',
     errDuplicate: 'An entry already exists for this date.',
-    chgpassTitle: 'Change Password',
-    lblCurPass: 'Current password', lblNewPass: 'New password',
-    btnDoChange: 'Update password', lblChgPass: 'Password',
     lbl_uname: 'Full name', lbl_uemail: 'Email address', lbl_urole: 'Role', lbl_upass: 'Password',
   },
   nl: {
@@ -857,9 +826,6 @@ const T = {
     pdfTitle: 'Urenstaat',
     errDates: 'Eindtijd moet na begintijd zijn.',
     errDuplicate: 'Er bestaat al een invoer voor deze datum.',
-    chgpassTitle: 'Wachtwoord wijzigen',
-    lblCurPass: 'Huidig wachtwoord', lblNewPass: 'Nieuw wachtwoord',
-    btnDoChange: 'Wachtwoord bijwerken', lblChgPass: 'Wachtwoord',
     lbl_uname: 'Volledige naam', lbl_uemail: 'E-mailadres', lbl_urole: 'Functie', lbl_upass: 'Wachtwoord',
   }
 };
@@ -878,7 +844,7 @@ function applyTranslations() {
   const s = id => document.getElementById(id);
   const set = (id, key) => { const el = s(id); if (el) el.textContent = t(key); };
   set('auth-subtitle', 'authSubtitle'); set('lbl-email', 'lblEmail'); set('lbl-password', 'lblPassword');
-  set('btn-login', 'btnLogin'); set('btn-signout', 'btnSignout'); set('lbl-chgpass', 'lblChgPass');
+  set('btn-login', 'btnLogin'); set('btn-signout', 'btnSignout');
   set('tab-mytime', 'tabMytime'); set('tab-mysummary', 'tabMysummary');
   set('tab-mytime-adm', 'tabMytime'); set('tab-mysummary-adm', 'tabMysummary');
   set('tab-overview', 'tabOverview'); set('tab-empdetail', 'tabEmpDetail');
@@ -900,8 +866,6 @@ function applyTranslations() {
   set('btn-save', 'btnSave'); set('btn-delete', 'btnDelete');
   set('btn-mypdf', 'btnPdf'); set('btn-myexcel', 'btnExcel');
   set('btn-adminpdf', 'btnPdf'); set('btn-adminexcel', 'btnExcel');
-  set('chgpass-title', 'chgpassTitle'); set('lbl-curpass', 'lblCurPass');
-  set('lbl-newpass', 'lblNewPass'); set('btn-dochange', 'btnDoChange');
   set('lbl-uname', 'lbl_uname'); set('lbl-uemail', 'lbl_uemail');
   set('lbl-urole', 'lbl_urole'); set('lbl-upass', 'lbl_upass');
 }
@@ -1037,7 +1001,6 @@ async function enterApp() {
   const isAdmin = currentUser.is_admin;
   document.getElementById('employee-tabs').style.display = isAdmin ? 'none' : '';
   document.getElementById('admin-tabs').style.display = isAdmin ? '' : 'none';
-  document.getElementById('btn-chgpass').style.display = isAdmin ? 'none' : '';
   document.getElementById('entry-date').value = today();
 
   applyTranslations();
@@ -1128,8 +1091,20 @@ async function renderCalendar() {
   else renderMonthView(calAnchor, todayS, evts, shifts);
 }
 
+// Small round photo (or initials, if no photo) used to identify a person at a glance
+// in the calendar — on shift chips and next to a birthday's name.
+function miniAvatar(picture, name, size) {
+  size = size || 16;
+  if (picture) {
+    return `<img src="${picture}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;">`;
+  }
+  const initial = (name || '?').trim()[0]?.toUpperCase() || '?';
+  return `<span style="display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:50%;background:rgba(0,0,0,0.12);color:inherit;font-size:${Math.round(size*0.55)}px;font-weight:700;flex-shrink:0;">${initial}</span>`;
+}
+
 function eventBadge(e) {
-  return `<div class="cal-event-badge ${EVT_CLASSES[e.event_type]||'evt-special'}" title="${e.description||''}">${e.title}</div>`;
+  const avatar = e.event_type === 'birthday' ? miniAvatar(e.picture, e.title, 14) : '';
+  return `<div class="cal-event-badge ${EVT_CLASSES[e.event_type]||'evt-special'}" title="${e.description||''}" style="display:flex;align-items:center;gap:4px;">${avatar}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.title}</span></div>`;
 }
 
 // Shift color varies by employee type so mixed Front Desk / Trainer / Pilates shifts read apart at a glance.
@@ -1143,8 +1118,9 @@ function roleColor(role) { return ROLE_COLORS[role] || { bg: 'var(--cream-dark)'
 function shiftChip(s) {
   const firstName = s.first_name || s.name.split(' ')[0];
   const c = roleColor(s.role);
-  return `<div style="font-size:11px;padding:4px 6px;background:${c.bg};border-radius:4px;color:${c.fg};font-weight:600;display:flex;justify-content:space-between;gap:4px;">
-    <span>${firstName}</span><span style="font-weight:400;">${s.start_time}–${s.end_time}</span>
+  return `<div style="font-size:11px;padding:4px 6px;background:${c.bg};border-radius:4px;color:${c.fg};font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:4px;">
+    <span style="display:flex;align-items:center;gap:5px;overflow:hidden;">${miniAvatar(s.picture, firstName, 15)}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${firstName}</span></span>
+    <span style="font-weight:400;flex-shrink:0;">${s.start_time}–${s.end_time}</span>
   </div>`;
 }
 
@@ -1207,6 +1183,7 @@ function renderDayView(dateS, todayS, evts, shifts) {
     ? `<div class="day-tl-events-bar">${dayEvts.map(e =>
         `<div class="day-tl-evt-pill ${EVT_CLASSES[e.event_type]||'evt-special'}">
           <span>${evtIcons[e.event_type]||'🎉'}</span>
+          ${e.event_type === 'birthday' ? miniAvatar(e.picture, e.title, 16) : ''}
           <span>${e.title}</span>
         </div>`).join('')}</div>`
     : '';
@@ -1263,7 +1240,7 @@ function renderDayView(dateS, todayS, evts, shifts) {
       ? `left:calc(${leftPct}% + 6px);width:calc(${widthPct}% - 8px);right:auto;`
       : `left:10px;right:10px;`;
     return `<div class="day-tl-shift" style="top:${top}px;height:${height}px;${posStyle}background:${c.bg};border-left-color:${c.fg};" title="${name} · ${t('roles')[s.role]||s.role} · ${s.start_time}–${s.end_time}">
-      <div class="day-tl-shift-name" style="color:${c.fg};">${name}</div>
+      <div class="day-tl-shift-name" style="color:${c.fg};display:flex;align-items:center;gap:5px;">${miniAvatar(s.picture, name, 16)}<span style="overflow:hidden;text-overflow:ellipsis;">${name}</span></div>
       ${showDetail ? `<div class="day-tl-shift-role">${t('roles')[s.role]||s.role}</div>
       <div class="day-tl-shift-time">${s.start_time} – ${s.end_time}</div>` : ''}
     </div>`;
@@ -1536,31 +1513,6 @@ async function deleteShift(id) {
 }
 
 // ══════════════════════════════════════════════════════
-// CHANGE PASSWORD
-// ══════════════════════════════════════════════════════
-function openChangePassword() {
-  document.getElementById('cur-pass').value = '';
-  document.getElementById('new-pass').value = '';
-  document.getElementById('conf-pass').value = '';
-  document.getElementById('chgpass-error').style.display = 'none';
-  document.getElementById('chgpass-modal').classList.add('open');
-}
-
-async function doChangePassword() {
-  const current = document.getElementById('cur-pass').value;
-  const newPassword = document.getElementById('new-pass').value;
-  const confirm = document.getElementById('conf-pass').value;
-  const errEl = document.getElementById('chgpass-error');
-  errEl.style.display = 'none';
-  if (newPassword.length < 6) { errEl.textContent = lang === 'nl' ? 'Nieuw wachtwoord minimaal 6 tekens.' : 'New password must be at least 6 characters.'; errEl.style.display = ''; return; }
-  if (newPassword !== confirm) { errEl.textContent = lang === 'nl' ? 'Wachtwoorden komen niet overeen.' : 'Passwords do not match.'; errEl.style.display = ''; return; }
-  const res = await api('PUT', '/auth/password', { current, newPassword });
-  if (!res || res.error) { errEl.textContent = res ? res.error : 'Error.'; errEl.style.display = ''; return; }
-  closeModal();
-  showToast(t('toastPassChanged'));
-}
-
-// ══════════════════════════════════════════════════════
 // MY PROFILE
 // ══════════════════════════════════════════════════════
 function renderMyProfile() {
@@ -1568,11 +1520,7 @@ function renderMyProfile() {
   document.getElementById('profile-lastname').value  = currentUser.last_name  || '';
   document.getElementById('profile-email').value     = currentUser.email || '';
   document.getElementById('profile-birthdate').value = currentUser.birthdate || '';
-  document.getElementById('prof-cur-pass').value = '';
-  document.getElementById('prof-new-pass').value = '';
-  document.getElementById('prof-conf-pass').value = '';
   document.getElementById('profile-save-error').style.display = 'none';
-  document.getElementById('prof-pass-error').style.display = 'none';
   updateProfileAvatar(
     document.getElementById('profile-avatar-img'),
     document.getElementById('profile-avatar-initials'),
@@ -1635,22 +1583,6 @@ async function saveProfile() {
   currentUser.birthdate  = birthdate;
   if (res.name) { currentUser.name = res.name; document.getElementById('topbar-username').textContent = res.name; }
   showToast(t('toastSaved'));
-}
-
-async function doChangePasswordProfile() {
-  const current = document.getElementById('prof-cur-pass').value;
-  const newPassword = document.getElementById('prof-new-pass').value;
-  const confirm = document.getElementById('prof-conf-pass').value;
-  const errEl = document.getElementById('prof-pass-error');
-  errEl.style.display = 'none';
-  if (newPassword.length < 6) { errEl.textContent = lang === 'nl' ? 'Nieuw wachtwoord minimaal 6 tekens.' : 'New password must be at least 6 characters.'; errEl.style.display = ''; return; }
-  if (newPassword !== confirm) { errEl.textContent = lang === 'nl' ? 'Wachtwoorden komen niet overeen.' : 'Passwords do not match.'; errEl.style.display = ''; return; }
-  const res = await api('PUT', '/auth/password', { current, newPassword });
-  if (!res || res.error) { errEl.textContent = res ? res.error : 'Error.'; errEl.style.display = ''; return; }
-  document.getElementById('prof-cur-pass').value = '';
-  document.getElementById('prof-new-pass').value = '';
-  document.getElementById('prof-conf-pass').value = '';
-  showToast(t('toastPassChanged'));
 }
 
 // ══════════════════════════════════════════════════════
