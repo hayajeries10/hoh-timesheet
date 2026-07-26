@@ -116,13 +116,12 @@
 
   /* ── ENTRY FORM ── */
   .entry-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 12px; align-items: end; }
-  @media (max-width: 600px) { .entry-form { grid-template-columns: 1fr 1fr; } .entry-form .btn { grid-column: span 2; } }
 
   /* ── TABLE ── */
   .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th { text-align: left; padding: 10px 12px; font-size: 12px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; background: var(--cream); border-bottom: 1px solid var(--border); white-space: nowrap; }
-  td { padding: 11px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  td { padding: 11px 12px; border-bottom: 1px solid var(--border); color: var(--text); white-space: nowrap; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: var(--cream); }
   .td-mono { font-family: var(--mono); font-size: 13px; }
@@ -173,7 +172,7 @@
   .admin-emp-select select { padding: 8px 12px; border: 1.5px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 14px; font-family: var(--font); color: var(--text); background: var(--white); outline: none; flex: 1; min-width: 160px; max-width: 260px; }
 
   /* ── MOBILE ── */
-  @media (max-width: 500px) {
+  @media (max-width: 640px) {
     .topbar { flex-wrap: wrap; height: auto; padding: 10px 1rem; row-gap: 8px; }
     .topbar-user { display: none; }
     .topbar-btn span { display: none; }
@@ -1652,8 +1651,7 @@ async function renderMyTime() {
 
   document.getElementById('my-stats-row').innerHTML = `
     <div class="stat-card"><div class="stat-label">${t('statTotalHours')}</div><div class="stat-value">${minutesToHHMM(stats.totalMin)}</div><div class="stat-sub">${monthLabel(mySelectedMonth)}</div></div>
-    <div class="stat-card"><div class="stat-label">${t('statDaysWorked')}</div><div class="stat-value">${stats.days}</div><div class="stat-sub">${t('statThisMonth')}</div></div>
-    <div class="stat-card"><div class="stat-label">${t('statAvgDay')}</div><div class="stat-value">${minutesToHHMM(stats.avg)}</div></div>`;
+    <div class="stat-card"><div class="stat-label">${t('statDaysWorked')}</div><div class="stat-value">${stats.days}</div><div class="stat-sub">${t('statThisMonth')}</div></div>`;
 
   document.getElementById('my-month-label').textContent = monthLabel(mySelectedMonth);
 
