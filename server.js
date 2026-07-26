@@ -397,11 +397,11 @@ app.delete('/api/entries/:id', auth, async (req, res) => {
 // ── ADMIN ROUTES ─────────────────────────────────────────
 app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   try {
-    // Excludes only the requesting admin themself, so other admins (including newly
-    // promoted ones) stay visible and manageable here — e.g. to demote them later.
+    // Shows every user, including the requesting admin themself — self-harm (deleting or
+    // demoting your own account) is guarded against directly on those routes instead of by
+    // hiding the row, since hiding it just makes an admin's own account look "missing".
     const { rows } = await pool.query(
-      "SELECT id, name, first_name, last_name, email, role, is_admin, birthdate, picture, TO_CHAR(created_at, 'YYYY-MM-DD') as created_at FROM users WHERE id != $1 ORDER BY name",
-      [req.user.id]
+      "SELECT id, name, first_name, last_name, email, role, is_admin, birthdate, picture, TO_CHAR(created_at, 'YYYY-MM-DD') as created_at FROM users ORDER BY name"
     );
     res.json(rows);
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
@@ -436,6 +436,9 @@ app.put('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
     const name = [fn, ln].filter(Boolean).join(' ') || u.name;
     const newPass = password ? bcrypt.hashSync(password, 10) : u.password;
     const newIsAdmin = is_admin !== undefined ? !!is_admin : u.is_admin;
+    if (String(req.params.id) === String(req.user.id) && u.is_admin && !newIsAdmin) {
+      return res.status(400).json({ error: 'You cannot remove your own admin access.' });
+    }
     await pool.query(
       'UPDATE users SET name=$1, first_name=$2, last_name=$3, email=$4, role=$5, password=$6, birthdate=$7, picture=$8, is_admin=$9 WHERE id=$10',
       [name, fn, ln, email ? email.toLowerCase().trim() : u.email, role || u.role, newPass, birthdate !== undefined ? birthdate : u.birthdate, picture !== undefined ? picture : u.picture, newIsAdmin, req.params.id]
@@ -449,6 +452,9 @@ app.put('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
 
 app.delete('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
   try {
+    if (String(req.params.id) === String(req.user.id)) {
+      return res.status(400).json({ error: 'You cannot remove your own account.' });
+    }
     await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Server error' }); }

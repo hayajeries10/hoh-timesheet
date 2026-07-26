@@ -1985,14 +1985,15 @@ async function renderAdminManage() {
     const avatarHtml = u.picture
       ? `<img src="${u.picture}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px;">`
       : `<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--green-pale);color:var(--green);font-weight:700;font-size:14px;vertical-align:middle;margin-right:8px;">${(u.first_name||u.name||'?')[0].toUpperCase()}</span>`;
+    const isSelf = currentUser && u.id === currentUser.id;
     return `<tr>
-      <td><div style="display:flex;align-items:center;">${avatarHtml}<div><div style="font-weight:600;">${u.name}</div>${u.birthdate ? `<div style="font-size:12px;color:var(--text-muted);">🎂 ${u.birthdate}</div>` : ''}</div></div></td>
+      <td><div style="display:flex;align-items:center;">${avatarHtml}<div><div style="font-weight:600;">${u.name}${isSelf ? ' <span style="font-weight:400;color:var(--text-muted);">(you)</span>' : ''}</div>${u.birthdate ? `<div style="font-size:12px;color:var(--text-muted);">🎂 ${u.birthdate}</div>` : ''}</div></div></td>
       <td style="color:var(--text-muted);font-size:13px;">${u.email}</td>
       <td><span class="badge badge-green">${t('roles')[u.role]||u.role}</span>${u.is_admin ? ` <span class="badge badge-amber">Admin</span>` : ''}</td>
       <td style="color:var(--text-muted);font-size:13px;">${u.created_at}</td>
       <td><div class="td-actions">
         <button class="btn btn-outline btn-sm" onclick="openEditUser(${u.id})">✏️</button>
-        <button class="btn btn-outline btn-sm" onclick="openDeleteUser(${u.id},'${u.name}')">🗑️</button>
+        ${isSelf ? '' : `<button class="btn btn-outline btn-sm" onclick="openDeleteUser(${u.id},'${u.name}')">🗑️</button>`}
       </div></td>
     </tr>`;
   }).join('');
@@ -2044,7 +2045,8 @@ function showEuForm(user) {
   document.getElementById('eu-pic-input').value = '';
 
   const isEdit = !!user;
-  document.getElementById('eu-delete-btn').style.display = isEdit ? '' : 'none';
+  const isSelf = isEdit && currentUser && user.id === currentUser.id;
+  document.getElementById('eu-delete-btn').style.display = (isEdit && !isSelf) ? '' : 'none';
   document.getElementById('eu-pass-card-title').textContent = isEdit
     ? (lang === 'nl' ? 'Wachtwoord wijzigen' : 'Change Password')
     : (lang === 'nl' ? 'Wachtwoord instellen' : 'Set Password');
