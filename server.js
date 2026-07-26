@@ -66,9 +66,11 @@ async function setupDatabase() {
       start_time TEXT NOT NULL,
       end_time TEXT NOT NULL,
       duration INTEGER NOT NULL,
-      created_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE (user_id, date)
+      created_at TIMESTAMP DEFAULT NOW()
     );
+    -- Split shifts (e.g. a morning + evening block on the same day) need more than one
+    -- entry per person per day, so the old one-per-day constraint has to go.
+    ALTER TABLE entries DROP CONSTRAINT IF EXISTS entries_user_id_date_key;
     CREATE TABLE IF NOT EXISTS shifts (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -455,6 +457,19 @@ app.get('/api/admin/entries/:userId', auth, adminOnly, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM entries WHERE user_id = $1 ORDER BY date ASC', [req.params.userId]);
     res.json(rows);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// Lets an admin log or backfill a time entry on behalf of any employee (e.g. importing history).
+app.post('/api/admin/entries', auth, adminOnly, async (req, res) => {
+  try {
+    const { user_id, date, start_time, end_time, duration } = req.body;
+    if (!user_id || !date || !start_time || !end_time || !duration) return res.status(400).json({ error: 'Missing fields' });
+    const { rows } = await pool.query(
+      'INSERT INTO entries (user_id, date, start_time, end_time, duration) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [user_id, date, start_time, end_time, duration]
+    );
+    res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
 });
 
