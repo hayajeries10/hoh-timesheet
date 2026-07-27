@@ -713,6 +713,13 @@
       <select id="shift-emp-select"></select>
     </div>
     <div class="form-group"><label>Date *</label><input type="date" id="shift-date"></div>
+    <div class="form-group">
+      <label>Quick fill</label>
+      <div class="form-grid-2">
+        <button type="button" class="btn btn-outline btn-sm" onclick="setShiftTimes('morning')">☀️ Morning · 08:00–12:30</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="setShiftTimes('evening')">🌙 Evening · 16:30–21:00</button>
+      </div>
+    </div>
     <div class="form-grid-2">
       <div class="form-group" style="margin:0;"><label>Start time *</label><input type="time" id="shift-start"></div>
       <div class="form-group" style="margin:0;"><label>End time *</label><input type="time" id="shift-end"></div>
@@ -1465,6 +1472,12 @@ async function populateShiftEmpSelect(selectedId) {
   }
   const sel = document.getElementById('shift-emp-select');
   sel.innerHTML = cachedAdminUsers.map(u => `<option value="${u.id}" ${String(u.id)===String(selectedId)?'selected':''}>${u.first_name || u.name.split(' ')[0]} ${u.last_name||''} — ${t('roles')[u.role]||u.role}</option>`).join('');
+}
+
+function setShiftTimes(period) {
+  const [start, end] = period === 'morning' ? ['08:00', '12:30'] : ['16:30', '21:00'];
+  document.getElementById('shift-start').value = start;
+  document.getElementById('shift-end').value = end;
 }
 
 async function openAddShift(prefillDate) {
