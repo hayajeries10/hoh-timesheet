@@ -115,7 +115,7 @@
   .stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
   /* ── ENTRY FORM ── */
-  .entry-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 12px; align-items: end; }
+  .entry-form { display: grid; grid-template-columns: 1fr 1fr 1fr 1.5fr auto; gap: 12px; align-items: end; }
 
   /* ── TABLE ── */
   .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); }
@@ -448,6 +448,7 @@
           <div class="form-group" style="margin:0;"><label id="lbl-date">Date</label><input type="date" id="entry-date"></div>
           <div class="form-group" style="margin:0;"><label id="lbl-start">Start time</label><input type="time" id="entry-start"></div>
           <div class="form-group" style="margin:0;"><label id="lbl-end">End time</label><input type="time" id="entry-end"></div>
+          <div class="form-group" style="margin:0;"><label id="lbl-notes">Notes (optional)</label><input type="text" id="entry-notes" maxlength="500" placeholder="e.g. covered for Sanne"></div>
           <button class="btn btn-primary" onclick="addEntry()" id="btn-addentry">Add</button>
         </div>
       </div>
@@ -633,6 +634,7 @@
     <div class="form-group"><label id="edit-lbl-date">Date</label><input type="date" id="edit-date"></div>
     <div class="form-group"><label id="edit-lbl-start">Start time</label><input type="time" id="edit-start"></div>
     <div class="form-group"><label id="edit-lbl-end">End time</label><input type="time" id="edit-end"></div>
+    <div class="form-group"><label id="edit-lbl-notes">Notes (optional)</label><input type="text" id="edit-notes" maxlength="500"></div>
     <div id="edit-error" class="error-msg" style="display:none;"></div>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal()" id="btn-cancel">Cancel</button>
@@ -785,7 +787,7 @@ const T = {
     tabOverview: 'Overview', tabEmpDetail: 'Employee Detail',
     tabAdminSum: 'Monthly Summary', tabTeamSummary: 'Team Summary', tabManage: 'Manage Users',
     lblAddEntry: 'Add Entry', lblDate: 'Date',
-    lblStart: 'Start time', lblEnd: 'End time', btnAdd: 'Add',
+    lblStart: 'Start time', lblEnd: 'End time', lblNotes: 'Notes (optional)', notesPlaceholder: 'e.g. covered for Sanne', btnAdd: 'Add',
     lblEntries: 'Time entries',
     thDate: 'Date', thDay: 'Day', thStart: 'Start', thEnd: 'End', thDuration: 'Duration', thNotes: 'Notes',
     lblAllEmployees: 'All Employees', lblEmpDetail: 'Employee Detail',
@@ -820,7 +822,7 @@ const T = {
     tabOverview: 'Overzicht', tabEmpDetail: 'Medewerker Detail',
     tabAdminSum: 'Maandoverzicht', tabTeamSummary: 'Teamoverzicht', tabManage: 'Gebruikers beheren',
     lblAddEntry: 'Invoer toevoegen', lblDate: 'Datum',
-    lblStart: 'Begintijd', lblEnd: 'Eindtijd', btnAdd: 'Toevoegen',
+    lblStart: 'Begintijd', lblEnd: 'Eindtijd', lblNotes: 'Notitie (optioneel)', notesPlaceholder: 'bijv. ingevallen voor Sanne', btnAdd: 'Toevoegen',
     lblEntries: 'Uren invoer',
     thDate: 'Datum', thDay: 'Dag', thStart: 'Begin', thEnd: 'Einde', thDuration: 'Duur', thNotes: 'Notities',
     lblAllEmployees: 'Alle Medewerkers', lblEmpDetail: 'Medewerker Detail',
@@ -869,7 +871,7 @@ function applyTranslations() {
   set('tab-overview', 'tabOverview'); set('tab-empdetail', 'tabEmpDetail');
   set('tab-adminsum', 'tabTeamSummary'); set('tab-manage', 'tabManage');
   set('lbl-addentry', 'lblAddEntry'); set('lbl-date', 'lblDate');
-  set('lbl-start', 'lblStart'); set('lbl-end', 'lblEnd'); set('btn-addentry', 'btnAdd');
+  set('lbl-start', 'lblStart'); set('lbl-end', 'lblEnd'); set('lbl-notes', 'lblNotes'); document.getElementById('entry-notes').placeholder = t('notesPlaceholder'); set('btn-addentry', 'btnAdd');
   set('lbl-entries', 'lblEntries');
   set('th-date', 'thDate'); set('th-day', 'thDay'); set('th-start', 'thStart'); set('th-end', 'thEnd'); set('th-duration', 'thDuration'); set('th-notes', 'thNotes');
   set('th-date2', 'thDate'); set('th-day2', 'thDay'); set('th-start2', 'thStart'); set('th-end2', 'thEnd'); set('th-duration2', 'thDuration'); set('th-notes2', 'thNotes');
@@ -879,7 +881,7 @@ function applyTranslations() {
   set('th-name', 'thName'); set('th-email', 'thEmail'); set('th-role', 'thRole'); set('th-joined', 'thJoined');
   set('lbl-mysummary', 'lblMySummary');
   set('edit-modal-title', 'editModalTitle'); set('edit-lbl-date', 'lblDate');
-  set('edit-lbl-start', 'lblStart'); set('edit-lbl-end', 'lblEnd');
+  set('edit-lbl-start', 'lblStart'); set('edit-lbl-end', 'lblEnd'); set('edit-lbl-notes', 'lblNotes');
   set('delete-modal-title', 'deleteModalTitle'); set('delete-modal-text', 'deleteModalText');
   set('btn-cancel', 'btnCancel'); set('btn-cancel2', 'btnCancel');
   set('btn-save', 'btnSave'); set('btn-delete', 'btnDelete');
@@ -1737,15 +1739,17 @@ async function addEntry() {
   const date = document.getElementById('entry-date').value;
   const start = document.getElementById('entry-start').value;
   const end = document.getElementById('entry-end').value;
+  const notes = document.getElementById('entry-notes').value.trim();
   if (!date || !start || !end) { showToast('Fill in all fields.'); return; }
   const startMin = parseTime(start), endMin = parseTime(end);
   if (endMin <= startMin) { showToast(t('errDates')); return; }
-  const res = await api('POST', '/entries', { date, start_time: start, end_time: end, duration: endMin - startMin });
+  const res = await api('POST', '/entries', { date, start_time: start, end_time: end, duration: endMin - startMin, notes });
   if (!res) return;
   if (res.error) { showToast(res.error); return; }
   cachedMyEntries.push(res);
   document.getElementById('entry-start').value = '';
   document.getElementById('entry-end').value = '';
+  document.getElementById('entry-notes').value = '';
   mySelectedMonth = getMonthKey(date);
   showToast(t('toastAdded'));
   renderMyTime();
@@ -1765,6 +1769,7 @@ function openEdit(entryId) {
   document.getElementById('edit-date').value = entry.date;
   document.getElementById('edit-start').value = entry.start_time;
   document.getElementById('edit-end').value = entry.end_time;
+  document.getElementById('edit-notes').value = entry.notes || '';
   document.getElementById('edit-error').style.display = 'none';
   document.getElementById('edit-modal').classList.add('open');
 }
@@ -1774,6 +1779,7 @@ async function saveEdit() {
   const date = document.getElementById('edit-date').value;
   const start = document.getElementById('edit-start').value;
   const end = document.getElementById('edit-end').value;
+  const notes = document.getElementById('edit-notes').value.trim();
   const errEl = document.getElementById('edit-error');
   errEl.style.display = 'none';
   const startMin = parseTime(start), endMin = parseTime(end);
@@ -1783,7 +1789,7 @@ async function saveEdit() {
   const entry = findCachedEntry(parseInt(id));
   const isMine = entry && entry.user_id === currentUser.id;
   const path = isMine ? `/entries/${id}` : `/admin/entries/${id}`;
-  const res = await api('PUT', path, { date, start_time: start, end_time: end, duration });
+  const res = await api('PUT', path, { date, start_time: start, end_time: end, duration, notes });
   if (!res || res.error) { errEl.textContent = res ? res.error : 'Error'; errEl.style.display = ''; return; }
 
   if (isMine) {
@@ -2327,7 +2333,8 @@ function generateExcel(rows, monthLabelStr) {
 window.addEventListener('click', e => { if (e.target.classList.contains('modal-overlay')) closeModal(); });
 document.getElementById('entry-date').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('entry-start').focus(); });
 document.getElementById('entry-start').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('entry-end').focus(); });
-document.getElementById('entry-end').addEventListener('keydown', e => { if(e.key==='Enter') addEntry(); });
+document.getElementById('entry-end').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('entry-notes').focus(); });
+document.getElementById('entry-notes').addEventListener('keydown', e => { if(e.key==='Enter') addEntry(); });
 document.getElementById('login-password').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
 // Apply saved language

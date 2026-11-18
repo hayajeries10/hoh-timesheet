@@ -31,6 +31,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
+// Notes are optional free text; keep them short and tidy.
+function cleanNotes(v) { return typeof v === 'string' ? v.trim().slice(0, 500) : undefined; }
+
 // ── DATABASE SETUP ──────────────────────────────────────
 async function setupDatabase() {
   await pool.query(`
@@ -368,8 +371,8 @@ app.post('/api/entries', auth, async (req, res) => {
     const { date, start_time, end_time, duration } = req.body;
     if (!date || !start_time || !end_time || !duration) return res.status(400).json({ error: 'Missing fields' });
     const { rows } = await pool.query(
-      'INSERT INTO entries (user_id, date, start_time, end_time, duration) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [req.user.id, date, start_time, end_time, duration]
+      'INSERT INTO entries (user_id, date, start_time, end_time, duration, notes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [req.user.id, date, start_time, end_time, duration, cleanNotes(req.body.notes) || '']
     );
     res.json(rows[0]);
   } catch (e) {
@@ -383,9 +386,10 @@ app.put('/api/entries/:id', auth, async (req, res) => {
     const { date, start_time, end_time, duration } = req.body;
     const check = await pool.query('SELECT * FROM entries WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
     if (!check.rows[0]) return res.status(404).json({ error: 'Not found' });
+    // notes left out of the request = keep the current note
     const { rows } = await pool.query(
-      'UPDATE entries SET date=$1, start_time=$2, end_time=$3, duration=$4 WHERE id=$5 RETURNING *',
-      [date, start_time, end_time, duration, req.params.id]
+      'UPDATE entries SET date=$1, start_time=$2, end_time=$3, duration=$4, notes=COALESCE($5, notes) WHERE id=$6 RETURNING *',
+      [date, start_time, end_time, duration, cleanNotes(req.body.notes) ?? null, req.params.id]
     );
     res.json(rows[0]);
   } catch (e) {
@@ -483,8 +487,8 @@ app.post('/api/admin/entries', auth, adminOnly, async (req, res) => {
     const { user_id, date, start_time, end_time, duration } = req.body;
     if (!user_id || !date || !start_time || !end_time || !duration) return res.status(400).json({ error: 'Missing fields' });
     const { rows } = await pool.query(
-      'INSERT INTO entries (user_id, date, start_time, end_time, duration) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [user_id, date, start_time, end_time, duration]
+      'INSERT INTO entries (user_id, date, start_time, end_time, duration, notes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [user_id, date, start_time, end_time, duration, cleanNotes(req.body.notes) || '']
     );
     res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
@@ -494,8 +498,8 @@ app.put('/api/admin/entries/:id', auth, adminOnly, async (req, res) => {
   try {
     const { date, start_time, end_time, duration } = req.body;
     const { rows } = await pool.query(
-      'UPDATE entries SET date=$1, start_time=$2, end_time=$3, duration=$4 WHERE id=$5 RETURNING *',
-      [date, start_time, end_time, duration, req.params.id]
+      'UPDATE entries SET date=$1, start_time=$2, end_time=$3, duration=$4, notes=COALESCE($5, notes) WHERE id=$6 RETURNING *',
+      [date, start_time, end_time, duration, cleanNotes(req.body.notes) ?? null, req.params.id]
     );
     res.json(rows[0]);
   } catch (e) {
