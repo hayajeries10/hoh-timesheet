@@ -53,9 +53,20 @@ async function setupDatabase() {
     -- Admin used to be a 4th "role" value; it's now a separate permission flag so someone
     -- can be e.g. Front Desk AND Admin at the same time. Migrate any existing admin rows.
     UPDATE users SET is_admin = TRUE, role = 'employee' WHERE role = 'admin';
-    UPDATE users SET role='frontdesk' WHERE name IN ('Haya','Caitilin','Elmira','Sanne') AND role='employee';
-    UPDATE users SET role='trainer'   WHERE name IN ('Arthur','Dani')                    AND role IN ('employee','trainer');
-    UPDATE users SET role='pilates'   WHERE name IN ('Alba','Susana')                    AND role='employee';
+    -- Employee types are managed by admins (Manage Users -> Employee types).
+    CREATE TABLE IF NOT EXISTS roles (
+      key TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      label_nl TEXT DEFAULT '',
+      color TEXT DEFAULT '',
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+    INSERT INTO roles (key, label, label_nl, color, sort_order) VALUES
+      ('pilates',   'Pilates',    'Pilates',    '#be185d', 1),
+      ('trainer',   'Trainer',    'Trainer',    '#4338ca', 2),
+      ('frontdesk', 'Front Desk', 'Balie',      '#667184', 3),
+      ('employee',  'Employee',   'Medewerker', '',        99)
+    ON CONFLICT (key) DO NOTHING;
     CREATE TABLE IF NOT EXISTS events (
       id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
@@ -327,18 +338,6 @@ app.post('/api/auth/google', async (req, res) => {
   } catch (e) { console.error('Google auth error:', e); res.status(500).json({ error: 'Server error' }); }
 });
 
-app.put('/api/auth/password', auth, async (req, res) => {
-  try {
-    const { current, newPassword } = req.body;
-    if (!current || !newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Invalid input' });
-    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
-    if (!bcrypt.compareSync(current, rows[0].password)) return res.status(401).json({ error: 'Current password is incorrect.' });
-    const hash = bcrypt.hashSync(newPassword, 10);
-    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hash, req.user.id]);
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: 'Server error' }); }
-});
-
 app.get('/api/profile', auth, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT id, name, first_name, last_name, email, role, is_admin, birthdate, picture FROM users WHERE id = $1', [req.user.id]);
@@ -404,6 +403,59 @@ app.delete('/api/entries/:id', auth, async (req, res) => {
     if (!check.rows[0]) return res.status(404).json({ error: 'Not found' });
     if (!req.user.is_admin && check.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
     await pool.query('DELETE FROM entries WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── EMPLOYEE TYPES ──────────────────────────────────────
+app.get('/api/roles', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT r.*, (SELECT COUNT(*)::int FROM users u WHERE u.role = r.key) AS user_count
+         FROM roles r ORDER BY r.sort_order, r.label`);
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/admin/roles', auth, adminOnly, async (req, res) => {
+  try {
+    const label = String(req.body.label || '').trim().slice(0, 40);
+    if (!label) return res.status(400).json({ error: 'Name is required.' });
+    const base = label.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'type';
+    let key = base, n = 2;
+    while ((await pool.query('SELECT 1 FROM roles WHERE key = $1', [key])).rows.length) key = `${base}_${n++}`;
+    const dup = await pool.query('SELECT 1 FROM roles WHERE LOWER(label) = LOWER($1)', [label]);
+    if (dup.rows.length) return res.status(409).json({ error: 'That type already exists.' });
+    const { rows } = await pool.query(
+      `INSERT INTO roles (key, label, label_nl, color, sort_order)
+       VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM roles WHERE sort_order < 99))
+       RETURNING *, 0 AS user_count`,
+      [key, label, String(req.body.label_nl || '').trim().slice(0, 40), String(req.body.color || '').slice(0, 20)]);
+    res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.put('/api/admin/roles/:key', auth, adminOnly, async (req, res) => {
+  try {
+    const { label, label_nl, color, sort_order } = req.body;
+    const { rows } = await pool.query(
+      `UPDATE roles SET label = COALESCE(NULLIF($1, ''), label), label_nl = COALESCE($2, label_nl),
+              color = COALESCE($3, color), sort_order = COALESCE($4, sort_order)
+        WHERE key = $5 RETURNING *`,
+      [label ? String(label).trim().slice(0, 40) : null, label_nl != null ? String(label_nl).trim().slice(0, 40) : null,
+       color != null ? String(color).slice(0, 20) : null, Number.isInteger(sort_order) ? sort_order : null, req.params.key]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/admin/roles/:key', auth, adminOnly, async (req, res) => {
+  try {
+    const used = await pool.query('SELECT COUNT(*)::int AS n FROM users WHERE role = $1', [req.params.key]);
+    if (used.rows[0].n > 0) return res.status(409).json({ error: `${used.rows[0].n} employee(s) still have this type. Change their type first.` });
+    const total = await pool.query('SELECT COUNT(*)::int AS n FROM roles');
+    if (total.rows[0].n <= 1) return res.status(400).json({ error: 'At least one type is needed.' });
+    await pool.query('DELETE FROM roles WHERE key = $1', [req.params.key]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Server error' }); }
 });

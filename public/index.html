@@ -172,13 +172,60 @@
   .admin-emp-select label { font-size: 13px; font-weight: 500; color: var(--text-muted); white-space: nowrap; }
   .admin-emp-select select { padding: 8px 12px; border: 1.5px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 14px; font-family: var(--font); color: var(--text); background: var(--white); outline: none; flex: 1; min-width: 160px; max-width: 260px; }
 
+  /* ── MANAGE USERS: type groups + types popup ── */
+  .group-row td { background: var(--cream, #f6f5f2); font-weight: 600; font-size: 13px; letter-spacing: .02em; padding-top: 14px; }
+  .group-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; flex: none; }
+  .group-count { display: inline-block; margin-left: 6px; font-weight: 500; font-size: 12px; color: var(--text-muted); background: var(--white); border-radius: 10px; padding: 1px 8px; }
+  .role-item { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--border, #eee); }
+  .role-item input { flex: 1; min-width: 0; padding: 7px 10px; border: 1.5px solid var(--border-strong); border-radius: var(--radius-sm); font-family: var(--font); font-size: 14px; }
+  .role-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; min-width: 34px; text-align: right; }
+  .role-item .btn[disabled] { opacity: .35; cursor: not-allowed; }
+  .role-add { display: flex; gap: 8px; margin-top: 12px; }
+  .role-add .btn { flex: none; width: auto !important; }
+  .role-add input { flex: 1; min-width: 0; padding: 8px 12px; border: 1.5px solid var(--border-strong); border-radius: var(--radius-sm); font-family: var(--font); font-size: 14px; }
+
   /* ── MOBILE ── */
   @media (max-width: 640px) {
     .topbar { flex-wrap: wrap; height: auto; padding: 10px 1rem; row-gap: 8px; }
     .topbar-user { display: none; }
     .topbar-btn span { display: none; }
     .app-content { padding: 1rem; }
-    .tabs { flex-wrap: wrap; }
+    .tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin-bottom: 1.25rem; }
+    .tabs::-webkit-scrollbar { display: none; }
+    #admin-tabs .tab-btn, .tab-btn { flex: 0 0 auto; padding: 8px 12px; font-size: 13px; }
+    .card { padding: 1.1rem; }
+    .modal { padding: 1.25rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+    .summary-header { flex-direction: column; align-items: stretch; gap: 10px; }
+    .export-btns select { flex: 1 1 100%; }
+    .card-header { flex-wrap: wrap; gap: 10px; }
+
+    /* Tables become a list of small cards: one card per row, each value with its column name. */
+    .table-wrap { overflow: visible; }
+    .table-wrap table, .table-wrap tbody, .table-wrap tr, .table-wrap td { display: block; width: 100%; }
+    .table-wrap thead { display: none; }
+    .table-wrap tr { border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; padding: 6px 12px; background: var(--white); }
+    .table-wrap td { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 5px 0; border: none; white-space: normal; text-align: right; min-height: 30px; }
+    .table-wrap td::before { content: attr(data-label); font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; text-align: left; flex: none; }
+    .table-wrap td[data-label=""]::before, .table-wrap td:not([data-label])::before { display: none; }
+    .table-wrap td[data-label=""] { justify-content: flex-start; text-align: left; }
+    .table-wrap td .td-actions { margin-left: auto; }
+    .table-wrap tr.group-row { border: none; background: none; padding: 10px 2px 2px; margin: 0; }
+    .table-wrap tr.group-row td { background: none; padding: 0; justify-content: flex-start; }
+    .table-wrap td[colspan] { justify-content: center; text-align: center; }
+    .table-wrap tr:has(td[colspan]):not(.group-row) { border: none; background: none; }
+    .td-notes { max-width: none; }
+    /* Time entries: compact two-line card (date · day · duration / start–end · note · buttons) */
+    :is(#my-entries-body, #admin-emp-body) tr:not(:has(td[colspan])) { display: grid; grid-template-columns: auto auto 1fr auto; column-gap: 10px; row-gap: 2px; align-items: center; padding: 8px 12px; }
+    :is(#my-entries-body, #admin-emp-body) td { display: block; min-height: 0; padding: 0; text-align: left; }
+    :is(#my-entries-body, #admin-emp-body) td::before { display: none; }
+    :is(#my-entries-body, #admin-emp-body) td:nth-child(1) { grid-area: 1 / 1; font-weight: 600; }
+    :is(#my-entries-body, #admin-emp-body) td:nth-child(2) { grid-area: 1 / 2; }
+    :is(#my-entries-body, #admin-emp-body) td:nth-child(5) { grid-area: 1 / 4; text-align: right; }
+    :is(#my-entries-body, #admin-emp-body) td:nth-child(3) { grid-area: 2 / 1; }
+    :is(#my-entries-body, #admin-emp-body) td:nth-child(4) { grid-area: 2 / 2; }
+    :is(#my-entries-body, #admin-emp-body) td:nth-child(4)::before { display: inline; content: '– '; font-size: inherit; text-transform: none; letter-spacing: 0; color: inherit; }
+    :is(#my-entries-body, #admin-emp-body) td:nth-child(6) { grid-area: 2 / 3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    :is(#my-entries-body, #admin-emp-body) td:nth-child(7) { grid-area: 2 / 4; }
     .entry-form { grid-template-columns: 1fr; }
     .entry-form .btn { width: 100%; }
     .export-btns { flex-wrap: wrap; }
@@ -220,8 +267,24 @@
   .cal-week-body { padding:8px; display:flex; flex-direction:column; gap:6px; flex:1; }
   .cal-event-badge { font-size:12px; padding:5px 7px; border-radius:5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cal-entry-chip { font-size:13px; padding:7px 8px; background:var(--green-pale); border-radius:5px; color:var(--green); font-weight:600; text-align:center; margin-top:2px; }
+  /* Tablets: fit the 7 days without sideways scrolling */
+  @media (min-width: 641px) and (max-width: 1000px) {
+    .cal-week-grid { min-width: 0; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+    .cal-week-body { padding: 4px; }
+    .cal-week-body .mini-avatar { display: none !important; }
+    .cal-week-body > div > div, .cal-week-body > div { padding-left: 6px !important; padding-right: 6px !important; font-size: 12px !important; }
+    .cal-week-day-num { font-size: 22px; }
+  }
   @media (max-width: 640px) {
-    .cal-week-col { min-height:auto; }
+    .cal-week-wrap { overflow-x: visible; }
+    .cal-week-grid { grid-template-columns: 1fr; min-width: 0; gap: 8px; }
+    .cal-week-col { min-height: auto; flex-direction: row; }
+    .cal-week-hdr { width: 64px; flex: none; border-bottom: none; border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; padding: 10px 4px; }
+    .cal-week-day-num { font-size: 22px; }
+    .cal-week-body { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
+    .cal-week-body > * { flex: 1 1 130px; min-width: 0; }
+    .cal-month-cell { min-height: 52px; padding: 3px; }
+    .cal-month-cell .cal-event-badge, .cal-month-cell .cal-entry-chip { font-size: 10px; padding: 2px 3px; }
   }
 
   /* Daily timeline */
@@ -448,7 +511,7 @@
           <div class="form-group" style="margin:0;"><label id="lbl-date">Date</label><input type="date" id="entry-date"></div>
           <div class="form-group" style="margin:0;"><label id="lbl-start">Start time</label><input type="time" id="entry-start"></div>
           <div class="form-group" style="margin:0;"><label id="lbl-end">End time</label><input type="time" id="entry-end"></div>
-          <div class="form-group" style="margin:0;"><label id="lbl-notes">Notes (optional)</label><input type="text" id="entry-notes" maxlength="500" placeholder="e.g. covered for Sanne"></div>
+          <div class="form-group" style="margin:0;"><label id="lbl-notes">Notes (optional)</label><input type="text" id="entry-notes" maxlength="500" placeholder="Add a note (optional)"></div>
           <button class="btn btn-primary" onclick="addEntry()" id="btn-addentry">Add</button>
         </div>
       </div>
@@ -518,6 +581,7 @@
           <div class="export-btns">
             <select id="admin-export-month" style="padding:8px 12px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);font-family:var(--font);font-size:14px;color:var(--text);background:var(--white);outline:none;" onchange="renderAdminSummary()"></select>
             <button class="btn btn-outline btn-sm" onclick="exportAdminPDF()" id="btn-adminpdf">PDF</button>
+            <button class="btn btn-outline btn-sm" onclick="exportTotalsPDF()" id="btn-totalspdf" title="One page with each employee's total hours, for the accountant">Totals PDF</button>
             <button class="btn btn-outline btn-sm" onclick="exportAdminExcel()" id="btn-adminexcel">Excel</button>
           </div>
         </div>
@@ -556,11 +620,14 @@
         <div class="card">
           <div class="card-header">
             <div class="card-title" id="lbl-manageusers">Manage Users</div>
-            <button class="btn btn-primary btn-sm" onclick="openAddUser()" id="btn-adduser">+ Add Employee</button>
+            <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center;">
+              <button class="btn btn-outline btn-sm" onclick="openRolesModal()" style="width:auto;white-space:nowrap;" id="btn-roles">Employee types</button>
+              <button class="btn btn-primary btn-sm" onclick="openAddUser()" id="btn-adduser" style="width:auto;white-space:nowrap;">+ Add Employee</button>
+            </div>
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th id="th-name">Name</th><th id="th-email">Email</th><th id="th-role">Role</th><th id="th-joined">Joined</th><th></th></tr></thead>
+              <thead><tr><th id="th-name">Name</th><th id="th-email" class="td-email">Email</th><th id="th-joined" class="td-joined">Joined</th><th></th></tr></thead>
               <tbody id="admin-users-body"></tbody>
             </table>
           </div>
@@ -592,12 +659,7 @@
           <div class="form-group"><label>Date of birth</label><input type="date" id="eu-birthdate"></div>
           <div class="form-group">
             <label>Role</label>
-            <select id="eu-role">
-              <option value="frontdesk">Front Desk</option>
-              <option value="trainer">Trainer</option>
-              <option value="pilates">Pilates</option>
-              <option value="employee">Employee</option>
-            </select>
+            <select id="eu-role"></select>
           </div>
           <div class="form-group" style="background:var(--green-pale);border-radius:var(--radius-sm);padding:10px 12px;">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0;">
@@ -613,13 +675,7 @@
           </div>
         </div>
 
-        <div class="card" style="margin-top:1rem;">
-          <div class="card-title" style="margin-bottom:1rem;" id="eu-pass-card-title">Password</div>
-          <div class="form-group"><label id="eu-pass-label">New password</label><input type="password" id="eu-pass" placeholder="Min. 6 characters"></div>
-          <div class="form-group"><label>Confirm password</label><input type="password" id="eu-pass-confirm" placeholder="Repeat password"></div>
-          <div id="eu-pass-error" class="error-msg" style="display:none;margin-bottom:10px;"></div>
-          <button class="btn btn-primary" onclick="saveUserPassword()" id="btn-eu-pass">Set password</button>
-        </div>
+</div>
       </div>
 
     </div>
@@ -682,6 +738,23 @@
   </div>
 </div>
 
+<!-- EMPLOYEE TYPES MODAL -->
+<div class="modal-overlay" id="roles-modal">
+  <div class="modal">
+    <div class="modal-title" id="roles-modal-title">Employee types</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;" id="roles-modal-help">Types group the employee list and colour their shifts. The order here is the order in Manage Users. A type can only be removed when nobody has it.</p>
+    <div id="roles-list"></div>
+    <div class="role-add">
+      <input type="text" id="new-role-name" maxlength="40" placeholder="New type, e.g. Yoga" onkeydown="if(event.key==='Enter') addRole()">
+      <button class="btn btn-primary btn-sm" onclick="addRole()">Add</button>
+    </div>
+    <div id="roles-error" class="error-msg" style="display:none;margin-top:10px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADD/EDIT EVENT MODAL -->
 <div class="modal-overlay" id="event-modal">
   <div class="modal">
@@ -693,7 +766,7 @@
       <label>Type</label>
       <select id="evt-type">
         <option value="day_off">Day Off</option>
-        <option value="hoh_university">HoH University</option>
+        <option value="hoh_university">HoH Anniversary</option>
         <option value="special">Special Event</option>
       </select>
     </div>
@@ -787,7 +860,7 @@ const T = {
     tabOverview: 'Overview', tabEmpDetail: 'Employee Detail',
     tabAdminSum: 'Monthly Summary', tabTeamSummary: 'Team Summary', tabManage: 'Manage Users',
     lblAddEntry: 'Add Entry', lblDate: 'Date',
-    lblStart: 'Start time', lblEnd: 'End time', lblNotes: 'Notes (optional)', notesPlaceholder: 'e.g. covered for Sanne', btnAdd: 'Add',
+    lblRoles: 'Employee types', rolesHelp: 'Types group the employee list and colour their shifts. The order here is the order in Manage Users. A type can only be removed when nobody has it.', newRolePh: 'New type, e.g. Yoga', lblStart: 'Start time', lblEnd: 'End time', lblNotes: 'Notes (optional)', notesPlaceholder: 'Add a note (optional)', btnAdd: 'Add',
     lblEntries: 'Time entries',
     thDate: 'Date', thDay: 'Day', thStart: 'Start', thEnd: 'End', thDuration: 'Duration', thNotes: 'Notes',
     lblAllEmployees: 'All Employees', lblEmpDetail: 'Employee Detail',
@@ -800,9 +873,8 @@ const T = {
     editModalTitle: 'Edit Entry', deleteModalTitle: 'Delete entry?',
     deleteModalText: 'This action cannot be undone.',
     btnCancel: 'Cancel', btnSave: 'Save changes', btnDelete: 'Delete',
-    btnPdf: 'PDF', btnExcel: 'Excel',
+    btnPdf: 'PDF', btnExcel: 'Excel', btnTotalsPdf: 'Totalen PDF', totalsTitle: 'Uren per medewerker', thEmployee: 'Medewerker', thType: 'Type', thDays: 'Dagen gewerkt', thHours: 'Totaal uren', thDecimal: 'Uren (decimaal)', grandTotal: 'Totaal alle medewerkers', btnTotalsPdf: 'Totals PDF', totalsTitle: 'Hours per employee', thEmployee: 'Employee', thType: 'Type', thDays: 'Days worked', thHours: 'Total hours', thDecimal: 'Hours (decimal)', grandTotal: 'Total all employees',
     toastAdded: 'Entry added!', toastSaved: 'Changes saved!', toastDeleted: 'Entry deleted.',
-    toastPassChanged: 'Password updated!',
     emptyEntries: 'No entries yet for this period.',
     emptyEntriesSub: 'Add your first entry above.',
     roles: { employee: 'Employee', trainer: 'Trainer', frontdesk: 'Front Desk', pilates: 'Pilates' },
@@ -822,7 +894,7 @@ const T = {
     tabOverview: 'Overzicht', tabEmpDetail: 'Medewerker Detail',
     tabAdminSum: 'Maandoverzicht', tabTeamSummary: 'Teamoverzicht', tabManage: 'Gebruikers beheren',
     lblAddEntry: 'Invoer toevoegen', lblDate: 'Datum',
-    lblStart: 'Begintijd', lblEnd: 'Eindtijd', lblNotes: 'Notitie (optioneel)', notesPlaceholder: 'bijv. ingevallen voor Sanne', btnAdd: 'Toevoegen',
+    lblRoles: 'Medewerkerstypes', rolesHelp: 'Types groeperen de medewerkerslijst en kleuren hun diensten. Deze volgorde is ook de volgorde in Gebruikers beheren. Een type kan alleen weg als niemand het heeft.', newRolePh: 'Nieuw type, bijv. Yoga', lblStart: 'Begintijd', lblEnd: 'Eindtijd', lblNotes: 'Notitie (optioneel)', notesPlaceholder: 'Voeg een notitie toe (optioneel)', btnAdd: 'Toevoegen',
     lblEntries: 'Uren invoer',
     thDate: 'Datum', thDay: 'Dag', thStart: 'Begin', thEnd: 'Einde', thDuration: 'Duur', thNotes: 'Notities',
     lblAllEmployees: 'Alle Medewerkers', lblEmpDetail: 'Medewerker Detail',
@@ -837,7 +909,6 @@ const T = {
     btnCancel: 'Annuleren', btnSave: 'Wijzigingen opslaan', btnDelete: 'Verwijderen',
     btnPdf: 'PDF', btnExcel: 'Excel',
     toastAdded: 'Invoer toegevoegd!', toastSaved: 'Wijzigingen opgeslagen!', toastDeleted: 'Invoer verwijderd.',
-    toastPassChanged: 'Wachtwoord bijgewerkt!',
     emptyEntries: 'Nog geen invoer voor deze periode.',
     emptyEntriesSub: 'Voeg hierboven je eerste invoer toe.',
     roles: { employee: 'Medewerker', trainer: 'Trainer', frontdesk: 'Balie', pilates: 'Pilates' },
@@ -878,6 +949,7 @@ function applyTranslations() {
   set('lbl-allemployees', 'lblAllEmployees'); set('lbl-empdetail', 'lblEmpDetail');
   set('lbl-selectemp', 'lblSelectEmp'); set('lbl-adminsum', 'lblAdminSum');
   set('lbl-manageusers', 'lblManageUsers'); set('btn-adduser', 'btnAddUser');
+  set('btn-totalspdf', 'btnTotalsPdf'); set('btn-roles', 'lblRoles'); set('roles-modal-title', 'lblRoles'); set('roles-modal-help', 'rolesHelp'); document.getElementById('new-role-name').placeholder = t('newRolePh');
   set('th-name', 'thName'); set('th-email', 'thEmail'); set('th-role', 'thRole'); set('th-joined', 'thJoined');
   set('lbl-mysummary', 'lblMySummary');
   set('edit-modal-title', 'editModalTitle'); set('edit-lbl-date', 'lblDate');
@@ -1027,6 +1099,7 @@ async function enterApp() {
   document.getElementById('admin-tabs').style.display = isAdmin ? '' : 'none';
   document.getElementById('entry-date').value = today();
 
+  await loadRoles();
   applyTranslations();
   showTab('calendar');
 }
@@ -1034,7 +1107,7 @@ async function enterApp() {
 // ══════════════════════════════════════════════════════
 // CALENDAR
 // ══════════════════════════════════════════════════════
-const EVT_LABELS = { day_off:'Day Off', birthday:'Birthday', hoh_university:'HoH University', special:'Special Event' };
+const EVT_LABELS = { day_off:'Day Off', birthday:'Birthday', hoh_university:'HoH Anniversary', special:'Special Event' };
 const EVT_CLASSES = { day_off:'evt-day_off', birthday:'evt-birthday', hoh_university:'evt-hoh_university', special:'evt-special' };
 const DOT_CLASSES = { day_off:'dot-day_off', birthday:'dot-birthday', hoh_university:'dot-hoh_university', special:'dot-special' };
 
@@ -1120,10 +1193,10 @@ async function renderCalendar() {
 function miniAvatar(picture, name, size) {
   size = size || 16;
   if (picture) {
-    return `<img src="${picture}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;">`;
+    return `<img class="mini-avatar" src="${picture}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;">`;
   }
   const initial = (name || '?').trim()[0]?.toUpperCase() || '?';
-  return `<span style="display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:50%;background:rgba(0,0,0,0.12);color:inherit;font-size:${Math.round(size*0.55)}px;font-weight:700;flex-shrink:0;">${initial}</span>`;
+  return `<span class="mini-avatar" style="display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:50%;background:rgba(0,0,0,0.12);color:inherit;font-size:${Math.round(size*0.55)}px;font-weight:700;flex-shrink:0;">${initial}</span>`;
 }
 
 function eventBadge(e) {
@@ -1131,13 +1204,29 @@ function eventBadge(e) {
   return `<div class="cal-event-badge ${EVT_CLASSES[e.event_type]||'evt-special'}" title="${e.description||''}" style="display:flex;align-items:center;gap:4px;">${avatar}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.title}</span></div>`;
 }
 
-// Shift color varies by employee type so mixed Front Desk / Trainer / Pilates shifts read apart at a glance.
-const ROLE_COLORS = {
-  frontdesk: { bg: 'var(--green-pale)', fg: 'var(--green)' },
-  trainer:   { bg: '#eef2ff',           fg: '#4338ca' },
-  pilates:   { bg: '#fdf2f8',           fg: '#be185d' },
-};
-function roleColor(role) { return ROLE_COLORS[role] || { bg: 'var(--cream-dark)', fg: 'var(--text-muted)' }; }
+// Employee types (Pilates, Trainer, Front Desk, ...) are managed by admins and stored in the database.
+// Shift colour follows the type so mixed shifts read apart at a glance.
+let cachedRoles = [];
+const ROLE_PALETTE = ['#be185d', '#4338ca', '#667184', '#0e7490', '#b45309', '#15803d', '#7c3aed', '#be123c'];
+async function loadRoles() {
+  const data = await api('GET', '/roles');
+  if (Array.isArray(data)) cachedRoles = data;
+}
+function roleLabel(key) {
+  const r = cachedRoles.find(x => x.key === key);
+  if (r) return (lang === 'nl' && r.label_nl) ? r.label_nl : r.label;
+  return (t('roles') || {})[key] || key || '';
+}
+function roleColor(key) {
+  const i = cachedRoles.findIndex(x => x.key === key);
+  const fg = i >= 0 ? (cachedRoles[i].color || ROLE_PALETTE[i % ROLE_PALETTE.length]) : '';
+  if (!fg || key === 'employee' && !cachedRoles[i].color) return { bg: 'var(--cream-dark)', fg: 'var(--text-muted)' };
+  return { bg: fg + '1f', fg };
+}
+function fillRoleSelect(sel, selected) {
+  sel.innerHTML = cachedRoles.map(r => `<option value="${escHtml(r.key)}">${escHtml(roleLabel(r.key))}</option>`).join('');
+  if (selected != null) sel.value = selected;
+}
 
 function shiftChip(s) {
   const firstName = s.first_name || s.name.split(' ')[0];
@@ -1202,7 +1291,7 @@ function renderDayView(dateS, todayS, evts, shifts) {
   const TOTAL = (END_H - START_H) * PX;
 
   // Events bar
-  const evtIcons = { day_off:'🏖️', birthday:'🎂', hoh_university:'🎓', special:'🎉' };
+  const evtIcons = { day_off:'🏖️', birthday:'🎂', hoh_university:'🎊', special:'🎉' };
   const evtsHtml = dayEvts.length
     ? `<div class="day-tl-events-bar">${dayEvts.map(e =>
         `<div class="day-tl-evt-pill ${EVT_CLASSES[e.event_type]||'evt-special'}">
@@ -1263,9 +1352,9 @@ function renderDayView(dateS, todayS, evts, shifts) {
     const posStyle = totalCols > 1
       ? `left:calc(${leftPct}% + 6px);width:calc(${widthPct}% - 8px);right:auto;`
       : `left:10px;right:10px;`;
-    return `<div class="day-tl-shift" style="top:${top}px;height:${height}px;${posStyle}background:${c.bg};border-left-color:${c.fg};" title="${name} · ${t('roles')[s.role]||s.role} · ${s.start_time}–${s.end_time}">
+    return `<div class="day-tl-shift" style="top:${top}px;height:${height}px;${posStyle}background:${c.bg};border-left-color:${c.fg};" title="${name} · ${roleLabel(s.role)} · ${s.start_time}–${s.end_time}">
       <div class="day-tl-shift-name" style="color:${c.fg};display:flex;align-items:center;gap:5px;">${miniAvatar(s.picture, name, 16)}<span style="overflow:hidden;text-overflow:ellipsis;">${name}</span></div>
-      ${showDetail ? `<div class="day-tl-shift-role">${t('roles')[s.role]||s.role}</div>
+      ${showDetail ? `<div class="day-tl-shift-role">${roleLabel(s.role)}</div>
       <div class="day-tl-shift-time">${s.start_time} – ${s.end_time}</div>` : ''}
     </div>`;
   }).join('');
@@ -1362,7 +1451,7 @@ async function renderEventsList() {
   }
   const real = cachedEvents.filter(e => typeof e.id === 'number').sort((a,b) => a.event_date.localeCompare(b.event_date));
   if (!real.length) {
-    container.innerHTML = `<div class="empty"><div class="empty-icon">📅</div><h3>No events yet.</h3><p>Add days off, university days, or special events.</p></div>`;
+    container.innerHTML = `<div class="empty"><div class="empty-icon">📅</div><h3>No events yet.</h3><p>Add days off, anniversaries, or special events.</p></div>`;
     return;
   }
   container.innerHTML = real.map(e => `
@@ -1459,7 +1548,7 @@ async function renderAdminShifts() {
     <tbody>${shifts.map(s => `<tr>
       <td>${s.shift_date}</td>
       <td class="td-day">${getDayName(s.shift_date)}</td>
-      <td style="font-weight:600;">${s.first_name || s.name.split(' ')[0]} <span class="badge badge-gray" style="margin-left:4px;">${t('roles')[s.role]||s.role}</span></td>
+      <td style="font-weight:600;">${s.first_name || s.name.split(' ')[0]} <span class="badge badge-gray" style="margin-left:4px;">${roleLabel(s.role)}</span></td>
       <td class="td-mono">${s.start_time}</td>
       <td class="td-mono">${s.end_time}</td>
       <td style="font-size:13px;color:var(--text-muted);">${s.notes || '—'}</td>
@@ -1477,7 +1566,7 @@ async function populateShiftEmpSelect(selectedId) {
     cachedAdminUsers = data || [];
   }
   const sel = document.getElementById('shift-emp-select');
-  sel.innerHTML = cachedAdminUsers.map(u => `<option value="${u.id}" ${String(u.id)===String(selectedId)?'selected':''}>${u.first_name || u.name.split(' ')[0]} ${u.last_name||''} — ${t('roles')[u.role]||u.role}</option>`).join('');
+  sel.innerHTML = cachedAdminUsers.map(u => `<option value="${u.id}" ${String(u.id)===String(selectedId)?'selected':''}>${u.first_name || u.name.split(' ')[0]} ${u.last_name||''} — ${roleLabel(u.role)}</option>`).join('');
 }
 
 function setShiftTimes(period) {
@@ -1617,6 +1706,20 @@ async function saveProfile() {
 // ══════════════════════════════════════════════════════
 // TABS
 // ══════════════════════════════════════════════════════
+// Give every table cell its column name, so on phones each row can show as a card.
+function labelTableCells(root) {
+  root.querySelectorAll('table').forEach(table => {
+    const heads = [...table.querySelectorAll('thead th')].map(th => th.textContent.trim());
+    if (!heads.length) return;
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      const cells = [...tr.children];
+      if (cells.some(td => td.colSpan > 1)) return;
+      cells.forEach((td, i) => { if (!td.hasAttribute('data-label')) td.setAttribute('data-label', i === 0 ? '' : (heads[i] || '')); });
+    });
+  });
+}
+new MutationObserver(() => labelTableCells(document)).observe(document.body, { childList: true, subtree: true });
+
 function showTab(tab) {
   activeTab = tab;
   ['calendar','my-time','my-summary','my-profile','admin-overview','admin-employee','admin-summary','admin-manage','admin-events','admin-shifts'].forEach(v => {
@@ -1633,7 +1736,7 @@ function showTab(tab) {
     'admin-shifts':'tab-shifts'
   };
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  const btn = document.getElementById(tabMap[tab]); if (btn) btn.classList.add('active');
+  const btn = document.getElementById(tabMap[tab]); if (btn) { btn.classList.add('active'); btn.scrollIntoView({ block: 'nearest', inline: 'center' }); }
   const view = document.getElementById('view-' + tab); if (view) view.style.display = '';
   renderCurrentView();
 }
@@ -1875,7 +1978,7 @@ async function renderAdminOverview() {
     return `<div class="emp-card" onclick="selectEmpDetail(${u.id})">
       <div class="emp-avatar" style="${u.picture ? 'padding:0;overflow:hidden;' : ''}">${avatarContent}</div>
       <div class="emp-name">${u.name}</div>
-      <div class="emp-role">${t('roles')[u.role] || u.role}</div>
+      <div class="emp-role">${roleLabel(u.role)}</div>
       <div class="emp-hours">⏱ ${minutesToHHMM(stats.totalMin)} · ${stats.days} ${t('statDaysWorked').toLowerCase()}</div>
     </div>`;
   }).join('');
@@ -1985,7 +2088,7 @@ async function renderAdminSummary() {
     return `<div style="margin-bottom:1.5rem;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
         <div class="emp-avatar" style="width:32px;height:32px;font-size:12px;">${initials}</div>
-        <div><div style="font-weight:600;">${r.user.name}</div><div style="font-size:12px;color:var(--text-muted);">${t('roles')[r.user.role]||r.user.role}</div></div>
+        <div><div style="font-weight:600;">${r.user.name}</div><div style="font-size:12px;color:var(--text-muted);">${roleLabel(r.user.role)}</div></div>
         <div style="margin-left:auto;font-family:var(--mono);font-weight:600;color:var(--green);">${minutesToHHMM(r.stats.totalMin)} · ${r.stats.days} ${lang==='nl'?'dagen':'days'}</div>
       </div>
       <div class="table-wrap"><table>
@@ -2006,25 +2109,104 @@ async function renderAdminManage() {
   }
   const tbody = document.getElementById('admin-users-body');
   if (!cachedAdminUsers.length) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="empty-icon">👥</div><h3>No employees yet.</h3></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty"><div class="empty-icon">👥</div><h3>No employees yet.</h3></div></td></tr>`;
     return;
   }
-  tbody.innerHTML = cachedAdminUsers.map(u => {
+  await loadRoles();
+  const userRow = u => {
     const avatarHtml = u.picture
       ? `<img src="${u.picture}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px;">`
       : `<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--green-pale);color:var(--green);font-weight:700;font-size:14px;vertical-align:middle;margin-right:8px;">${(u.first_name||u.name||'?')[0].toUpperCase()}</span>`;
     const isSelf = currentUser && u.id === currentUser.id;
     return `<tr>
-      <td><div style="display:flex;align-items:center;">${avatarHtml}<div><div style="font-weight:600;">${u.name}${isSelf ? ' <span style="font-weight:400;color:var(--text-muted);">(you)</span>' : ''}</div>${u.birthdate ? `<div style="font-size:12px;color:var(--text-muted);">🎂 ${u.birthdate}</div>` : ''}</div></div></td>
-      <td style="color:var(--text-muted);font-size:13px;">${u.email}</td>
-      <td><span class="badge badge-green">${t('roles')[u.role]||u.role}</span>${u.is_admin ? ` <span class="badge badge-amber">Admin</span>` : ''}</td>
-      <td style="color:var(--text-muted);font-size:13px;">${u.created_at}</td>
+      <td data-label=""><div style="display:flex;align-items:center;">${avatarHtml}<div><div style="font-weight:600;">${escHtml(u.name)}${isSelf ? ' <span style="font-weight:400;color:var(--text-muted);">(you)</span>' : ''}${u.is_admin ? ` <span class="badge badge-amber">Admin</span>` : ''}</div>${u.birthdate ? `<div style="font-size:12px;color:var(--text-muted);">🎂 ${u.birthdate}</div>` : ''}</div></div></td>
+      <td class="td-email" style="color:var(--text-muted);font-size:13px;">${escHtml(u.email)}</td>
+      <td class="td-joined" style="color:var(--text-muted);font-size:13px;">${u.created_at}</td>
       <td><div class="td-actions">
         <button class="btn btn-outline btn-sm" onclick="openEditUser(${u.id})">✏️</button>
-        ${isSelf ? '' : `<button class="btn btn-outline btn-sm" onclick="openDeleteUser(${u.id},'${u.name}')">🗑️</button>`}
+        ${isSelf ? '' : `<button class="btn btn-outline btn-sm" onclick="openDeleteUser(${u.id},'${escHtml(u.name).replace(/'/g, "\\'")}')">🗑️</button>`}
       </div></td>
     </tr>`;
+  };
+  // One section per employee type, in the order set under "Employee types"; anything else last.
+  const groups = cachedRoles.map(r => ({ key: r.key, label: roleLabel(r.key), color: roleColor(r.key) }));
+  const known = new Set(groups.map(g => g.key));
+  if (cachedAdminUsers.some(u => !known.has(u.role))) groups.push({ key: null, label: lang === 'nl' ? 'Overig' : 'Other', color: roleColor('') });
+  const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
+  tbody.innerHTML = groups.map(g => {
+    const users = cachedAdminUsers.filter(u => g.key ? u.role === g.key : !known.has(u.role)).sort(byName);
+    if (!users.length) return '';
+    return `<tr class="group-row"><td colspan="4"><span class="group-dot" style="background:${g.color.fg};"></span>${escHtml(g.label)} <span class="group-count">${users.length}</span></td></tr>`
+      + users.map(userRow).join('');
   }).join('');
+}
+
+// ── Employee types popup ─────────────────────────────────
+async function openRolesModal() {
+  await loadRoles();
+  renderRolesModal();
+  document.getElementById('roles-error').style.display = 'none';
+  document.getElementById('new-role-name').value = '';
+  document.getElementById('roles-modal').classList.add('open');
+}
+
+function renderRolesModal() {
+  const list = document.getElementById('roles-list');
+  list.innerHTML = cachedRoles.map((r, i) => `
+    <div class="role-item">
+      <span class="group-dot" style="background:${roleColor(r.key).fg};"></span>
+      <input type="text" value="${escHtml(r.label)}" maxlength="40" onchange="renameRole('${r.key}', this.value)" aria-label="Type name">
+      <span class="role-count" title="${lang === 'nl' ? 'medewerkers' : 'employees'}">👤 ${r.user_count}</span>
+      <button class="btn btn-outline btn-sm btn-icon" onclick="moveRole(${i}, -1)" ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
+      <button class="btn btn-outline btn-sm btn-icon" onclick="moveRole(${i}, 1)" ${i === cachedRoles.length - 1 ? 'disabled' : ''} title="Move down">↓</button>
+      <button class="btn btn-outline btn-sm btn-icon" onclick="deleteRole('${r.key}')" ${r.user_count ? `disabled title="${lang === 'nl' ? 'In gebruik' : 'In use — change these employees first'}"` : 'title="Remove"'}>🗑️</button>
+    </div>`).join('');
+}
+
+function rolesError(msg) {
+  const el = document.getElementById('roles-error');
+  el.textContent = msg; el.style.display = msg ? '' : 'none';
+}
+
+async function afterRolesChange() {
+  await loadRoles();
+  renderRolesModal();
+  if (document.getElementById('view-admin-manage').style.display !== 'none') renderAdminManage();
+}
+
+async function addRole() {
+  const input = document.getElementById('new-role-name');
+  const label = input.value.trim();
+  if (!label) return;
+  const res = await api('POST', '/admin/roles', { label });
+  if (!res || res.error) { rolesError(res ? res.error : 'Error'); return; }
+  rolesError(''); input.value = '';
+  await afterRolesChange();
+}
+
+async function renameRole(key, label) {
+  label = label.trim();
+  if (!label) { renderRolesModal(); return; }
+  const res = await api('PUT', `/admin/roles/${encodeURIComponent(key)}`, { label });
+  if (!res || res.error) { rolesError(res ? res.error : 'Error'); return; }
+  rolesError('');
+  await afterRolesChange();
+}
+
+async function moveRole(index, dir) {
+  const j = index + dir;
+  if (j < 0 || j >= cachedRoles.length) return;
+  const order = cachedRoles.map(r => r.key);
+  [order[index], order[j]] = [order[j], order[index]];
+  await Promise.all(order.map((key, i) => api('PUT', `/admin/roles/${encodeURIComponent(key)}`, { sort_order: i + 1 })));
+  await afterRolesChange();
+}
+
+async function deleteRole(key) {
+  const res = await api('DELETE', `/admin/roles/${encodeURIComponent(key)}`);
+  if (!res || res.error) { rolesError(res ? res.error : 'Error'); return; }
+  rolesError('');
+  await afterRolesChange();
 }
 
 let euUserId = '';
@@ -2063,25 +2245,15 @@ function showEuForm(user) {
   document.getElementById('eu-lastname').value  = user ? (user.last_name  || '') : '';
   document.getElementById('eu-email').value     = user ? user.email : '';
   document.getElementById('eu-birthdate').value = user ? (user.birthdate  || '') : '';
-  document.getElementById('eu-role').value      = user ? user.role : 'employee';
+  fillRoleSelect(document.getElementById('eu-role'), user ? user.role : (cachedRoles.some(r => r.key === 'employee') ? 'employee' : (cachedRoles[0] || {}).key));
   euOriginalIsAdmin = user ? !!user.is_admin : false;
   document.getElementById('eu-is-admin').checked = euOriginalIsAdmin;
-  document.getElementById('eu-pass').value      = '';
-  document.getElementById('eu-pass-confirm').value = '';
   document.getElementById('eu-error').style.display = 'none';
-  document.getElementById('eu-pass-error').style.display = 'none';
   document.getElementById('eu-pic-input').value = '';
 
   const isEdit = !!user;
   const isSelf = isEdit && currentUser && user.id === currentUser.id;
   document.getElementById('eu-delete-btn').style.display = (isEdit && !isSelf) ? '' : 'none';
-  document.getElementById('eu-pass-card-title').textContent = isEdit
-    ? (lang === 'nl' ? 'Wachtwoord wijzigen' : 'Change Password')
-    : (lang === 'nl' ? 'Wachtwoord instellen' : 'Set Password');
-  document.getElementById('eu-pass-label').textContent = isEdit
-    ? (lang === 'nl' ? 'Nieuw wachtwoord (leeg = ongewijzigd)' : 'New password (leave blank to keep current)')
-    : (lang === 'nl' ? 'Wachtwoord (optioneel — inloggen gaat via Google)' : 'Password (optional — sign-in is via Google)');
-
   document.getElementById('manage-list').style.display = 'none';
   document.getElementById('manage-edit-form').style.display = '';
 }
@@ -2115,17 +2287,6 @@ async function saveUserEdit() {
   }
 
   const body = { first_name, last_name, email, role, birthdate, picture: euPicture, is_admin: isAdminChecked };
-
-  if (!euUserId) {
-    const pass    = document.getElementById('eu-pass').value;
-    const confirm = document.getElementById('eu-pass-confirm').value;
-    // Password is optional now that employees sign in with Google — only validate it if one was entered.
-    if (pass || confirm) {
-      if (pass.length < 6) { errEl.textContent = lang === 'nl' ? 'Wachtwoord minimaal 6 tekens.' : 'Password must be at least 6 characters.'; errEl.style.display = ''; return; }
-      if (pass !== confirm) { errEl.textContent = lang === 'nl' ? 'Wachtwoorden komen niet overeen.' : 'Passwords do not match.'; errEl.style.display = ''; return; }
-      body.password = pass;
-    }
-  }
 
   // Granting Admin (new user checked, or an existing non-admin being promoted) needs
   // explicit confirmation before it actually takes effect.
@@ -2164,22 +2325,6 @@ async function performSaveUser(body) {
   showToast(euUserId ? t('toastSaved') : t('toastAdded'));
   closeUserEdit();
   renderAdminManage();
-}
-
-async function saveUserPassword() {
-  const pass    = document.getElementById('eu-pass').value;
-  const confirm = document.getElementById('eu-pass-confirm').value;
-  const errEl   = document.getElementById('eu-pass-error');
-  errEl.style.display = 'none';
-  if (!euUserId) { saveUserEdit(); return; }
-  if (!pass) { errEl.textContent = lang === 'nl' ? 'Voer een nieuw wachtwoord in.' : 'Enter a new password.'; errEl.style.display = ''; return; }
-  if (pass.length < 6) { errEl.textContent = lang === 'nl' ? 'Minimaal 6 tekens.' : 'Minimum 6 characters.'; errEl.style.display = ''; return; }
-  if (pass !== confirm) { errEl.textContent = lang === 'nl' ? 'Wachtwoorden komen niet overeen.' : 'Passwords do not match.'; errEl.style.display = ''; return; }
-  const res = await api('PUT', `/admin/users/${euUserId}`, { password: pass });
-  if (!res || res.error) { errEl.textContent = res ? res.error : 'Error'; errEl.style.display = ''; return; }
-  document.getElementById('eu-pass').value = '';
-  document.getElementById('eu-pass-confirm').value = '';
-  showToast(t('toastPassChanged'));
 }
 
 function openDeleteUserFromPage() {
@@ -2244,7 +2389,7 @@ function generatePDF(rows, monthLabelStr) {
     doc.setFontSize(13); doc.setFont('helvetica', 'bold');
     doc.text(r.user.name, ml, y + 6);
     doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 90, 82);
-    doc.text(`${t('roles')[r.user.role]||r.user.role} · ${t('statTotalHours')}: ${minutesToHHMM(r.stats.totalMin)} · ${t('statDaysWorked')}: ${r.stats.days}`, ml, y + 12);
+    doc.text(`${roleLabel(r.user.role)} · ${t('statTotalHours')}: ${minutesToHHMM(r.stats.totalMin)} · ${t('statDaysWorked')}: ${r.stats.days}`, ml, y + 12);
     y += 18;
 
     doc.setFillColor(232, 243, 237);
@@ -2274,6 +2419,66 @@ function generatePDF(rows, monthLabelStr) {
   doc.setTextColor(150, 150, 140); doc.setFontSize(8); doc.setFont('helvetica', 'normal');
   doc.text(`Generated: ${new Date().toLocaleDateString()} · House of Habits`, pw / 2, 290, { align: 'center' });
   doc.save(`timesheet-${monthLabelStr.replace(/ /g, '-')}.pdf`);
+}
+
+// One page per month for the accountant: each employee's days and total hours, no daily detail.
+function exportTotalsPDF() {
+  const selectedMk = document.getElementById('admin-export-month').value;
+  const order = new Map(cachedRoles.map((r, i) => [r.key, i]));
+  const rows = cachedAdminUsers.map(u => {
+    const entries = (cachedAdminEntries[u.id] || []).filter(e => getMonthKey(e.date) === selectedMk);
+    return { user: u, stats: calcStats(entries) };
+  }).filter(r => r.stats.totalMin > 0)
+    .sort((a, b) => ((order.get(a.user.role) ?? 999) - (order.get(b.user.role) ?? 999)) || a.user.name.localeCompare(b.user.name));
+  if (!rows.length) { showToast(t('emptyEntries')); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pw = 210, ml = 15, mr = 15, cw = pw - ml - mr;
+  const period = monthLabel(selectedMk);
+  let y = 20;
+  doc.setFillColor(26, 58, 42);
+  doc.roundedRect(ml, y - 8, cw, 20, 3, 3, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+  doc.text('House of Habits', ml + 8, y + 2);
+  doc.setFontSize(11); doc.setFont('helvetica', 'normal');
+  doc.text(`${t('totalsTitle')} — ${period}`, pw - mr - 8, y + 2, { align: 'right' });
+  y += 22;
+
+  const xs = [ml + 3, ml + 62, ml + 100, ml + 127, pw - mr - 3];
+  const header = () => {
+    doc.setFillColor(232, 243, 237); doc.rect(ml, y, cw, 9, 'F');
+    doc.setTextColor(26, 58, 42); doc.setFontSize(9.5); doc.setFont('helvetica', 'bold');
+    doc.text(t('thEmployee'), xs[0], y + 6); doc.text(t('thType'), xs[1], y + 6);
+    doc.text(t('thDays'), xs[2], y + 6); doc.text(t('thHours'), xs[3], y + 6);
+    doc.text(t('thDecimal'), xs[4], y + 6, { align: 'right' });
+    y += 10;
+  };
+  header();
+  let totMin = 0, totDays = 0;
+  rows.forEach((r, i) => {
+    if (y > 270) { doc.addPage(); y = 20; header(); }
+    if (i % 2 === 0) { doc.setFillColor(250, 248, 244); doc.rect(ml, y - 1, cw, 8, 'F'); }
+    doc.setTextColor(26, 26, 24); doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+    doc.text(r.user.name, xs[0], y + 4.5);
+    doc.text(roleLabel(r.user.role), xs[1], y + 4.5);
+    doc.text(String(r.stats.days), xs[2], y + 4.5);
+    doc.setFont('helvetica', 'bold'); doc.text(minutesToHHMM(r.stats.totalMin), xs[3], y + 4.5);
+    doc.setFont('helvetica', 'normal'); doc.text((r.stats.totalMin / 60).toFixed(2), xs[4], y + 4.5, { align: 'right' });
+    totMin += r.stats.totalMin; totDays += r.stats.days;
+    y += 8;
+  });
+  doc.setFillColor(26, 58, 42); doc.rect(ml, y + 1, cw, 9, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+  doc.text(t('grandTotal'), xs[0], y + 7);
+  doc.text(String(totDays), xs[2], y + 7);
+  doc.text(minutesToHHMM(totMin), xs[3], y + 7);
+  doc.text((totMin / 60).toFixed(2), xs[4], y + 7, { align: 'right' });
+
+  doc.setTextColor(150, 150, 140); doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+  doc.text(`Generated: ${new Date().toLocaleDateString()} · House of Habits`, pw / 2, 290, { align: 'center' });
+  doc.save(`hours-per-employee-${period.replace(/[\s–]+/g, '-')}.pdf`);
 }
 
 // ══════════════════════════════════════════════════════
@@ -2316,7 +2521,7 @@ function generateExcel(rows, monthLabelStr) {
     const summaryData = [
       ['House of Habits — Summary', monthLabelStr], [],
       [t('thName'), t('thRole'), t('statDaysWorked'), t('statTotalHours'), 'Minutes'],
-      ...rows.map(r => [r.user.name, t('roles')[r.user.role]||r.user.role, r.stats.days, minutesToHHMM(r.stats.totalMin), r.stats.totalMin]),
+      ...rows.map(r => [r.user.name, roleLabel(r.user.role), r.stats.days, minutesToHHMM(r.stats.totalMin), r.stats.totalMin]),
       [],
       ['TOTAL','',rows.reduce((s,r)=>s+r.stats.days,0), minutesToHHMM(rows.reduce((s,r)=>s+r.stats.totalMin,0)), rows.reduce((s,r)=>s+r.stats.totalMin,0)]
     ];
