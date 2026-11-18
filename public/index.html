@@ -127,6 +127,7 @@
   .td-mono { font-family: var(--mono); font-size: 13px; }
   .td-day { color: var(--text-muted); font-size: 13px; }
   .td-duration { font-weight: 600; color: var(--green); }
+  .td-notes { font-size: 13px; color: var(--text-muted); max-width: 260px; }
   .td-actions { display: flex; gap: 6px; justify-content: flex-end; }
 
   /* ── MONTH FILTER ── */
@@ -453,7 +454,7 @@
       <div class="card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th id="th-date">Date</th><th id="th-day">Day</th><th id="th-start">Start</th><th id="th-end">End</th><th id="th-duration">Duration</th><th></th></tr></thead>
+            <thead><tr><th id="th-date">Date</th><th id="th-day">Day</th><th id="th-start">Start</th><th id="th-end">End</th><th id="th-duration">Duration</th><th id="th-notes">Notes</th><th></th></tr></thead>
             <tbody id="my-entries-body"></tbody>
           </table>
         </div>
@@ -501,7 +502,7 @@
         <div class="month-nav" id="admin-emp-month-nav" style="margin-bottom:1rem;"></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th id="th-date2">Date</th><th id="th-day2">Day</th><th id="th-start2">Start</th><th id="th-end2">End</th><th id="th-duration2">Duration</th><th></th></tr></thead>
+            <thead><tr><th id="th-date2">Date</th><th id="th-day2">Day</th><th id="th-start2">Start</th><th id="th-end2">End</th><th id="th-duration2">Duration</th><th id="th-notes2">Notes</th><th></th></tr></thead>
             <tbody id="admin-emp-body"></tbody>
           </table>
         </div>
@@ -786,7 +787,7 @@ const T = {
     lblAddEntry: 'Add Entry', lblDate: 'Date',
     lblStart: 'Start time', lblEnd: 'End time', btnAdd: 'Add',
     lblEntries: 'Time entries',
-    thDate: 'Date', thDay: 'Day', thStart: 'Start', thEnd: 'End', thDuration: 'Duration',
+    thDate: 'Date', thDay: 'Day', thStart: 'Start', thEnd: 'End', thDuration: 'Duration', thNotes: 'Notes',
     lblAllEmployees: 'All Employees', lblEmpDetail: 'Employee Detail',
     lblSelectEmp: 'Employee:', lblAdminSum: 'Monthly Summary — All Employees',
     lblManageUsers: 'Manage Users', btnAddUser: '+ Add Employee',
@@ -821,7 +822,7 @@ const T = {
     lblAddEntry: 'Invoer toevoegen', lblDate: 'Datum',
     lblStart: 'Begintijd', lblEnd: 'Eindtijd', btnAdd: 'Toevoegen',
     lblEntries: 'Uren invoer',
-    thDate: 'Datum', thDay: 'Dag', thStart: 'Begin', thEnd: 'Einde', thDuration: 'Duur',
+    thDate: 'Datum', thDay: 'Dag', thStart: 'Begin', thEnd: 'Einde', thDuration: 'Duur', thNotes: 'Notities',
     lblAllEmployees: 'Alle Medewerkers', lblEmpDetail: 'Medewerker Detail',
     lblSelectEmp: 'Medewerker:', lblAdminSum: 'Maandoverzicht — Alle Medewerkers',
     lblManageUsers: 'Gebruikers beheren', btnAddUser: '+ Medewerker toevoegen',
@@ -870,8 +871,8 @@ function applyTranslations() {
   set('lbl-addentry', 'lblAddEntry'); set('lbl-date', 'lblDate');
   set('lbl-start', 'lblStart'); set('lbl-end', 'lblEnd'); set('btn-addentry', 'btnAdd');
   set('lbl-entries', 'lblEntries');
-  set('th-date', 'thDate'); set('th-day', 'thDay'); set('th-start', 'thStart'); set('th-end', 'thEnd'); set('th-duration', 'thDuration');
-  set('th-date2', 'thDate'); set('th-day2', 'thDay'); set('th-start2', 'thStart'); set('th-end2', 'thEnd'); set('th-duration2', 'thDuration');
+  set('th-date', 'thDate'); set('th-day', 'thDay'); set('th-start', 'thStart'); set('th-end', 'thEnd'); set('th-duration', 'thDuration'); set('th-notes', 'thNotes');
+  set('th-date2', 'thDate'); set('th-day2', 'thDay'); set('th-start2', 'thStart'); set('th-end2', 'thEnd'); set('th-duration2', 'thDuration'); set('th-notes2', 'thNotes');
   set('lbl-allemployees', 'lblAllEmployees'); set('lbl-empdetail', 'lblEmpDetail');
   set('lbl-selectemp', 'lblSelectEmp'); set('lbl-adminsum', 'lblAdminSum');
   set('lbl-manageusers', 'lblManageUsers'); set('btn-adduser', 'btnAddUser');
@@ -913,6 +914,9 @@ function monthLabel(key) {
   const months = t('months');
   return `25 ${months[pm-1].slice(0,3)} – 24 ${months[m-1].slice(0,3)} ${y}`;
 }
+// Notes are free text typed by people, so escape them before putting them in the page.
+function escHtml(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 function calcStats(entries) {
   const totalMin = entries.reduce((s, e) => s + e.duration, 0);
   const days = entries.length;
@@ -1673,13 +1677,14 @@ async function renderMyTime() {
 
   const tbody = document.getElementById('my-entries-body');
   if (!entries.length) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div><h3>${t('emptyEntries')}</h3><p>${t('emptyEntriesSub')}</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><h3>${t('emptyEntries')}</h3><p>${t('emptyEntriesSub')}</p></div></td></tr>`;
     return;
   }
   tbody.innerHTML = entries.map(e => `<tr>
     <td>${e.date}</td><td class="td-day">${getDayName(e.date)}</td>
     <td class="td-mono">${e.start_time}</td><td class="td-mono">${e.end_time}</td>
     <td class="td-mono td-duration">${minutesToHHMM(e.duration)}</td>
+    <td class="td-notes">${escHtml(e.notes)}</td>
     <td><div class="td-actions">
       <button class="btn btn-outline btn-sm btn-icon" onclick="openEdit(${e.id})" title="Edit">✏️</button>
       <button class="btn btn-outline btn-sm btn-icon" onclick="openDelete(${e.id})" title="Delete">🗑️</button>
@@ -1716,8 +1721,8 @@ function buildSummaryTable(entries, stats) {
       <div class="stat-card"><div class="stat-label">${t('statAvgDay')}</div><div class="stat-value">${minutesToHHMM(stats.avg)}</div></div>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>${t('thDate')}</th><th>${t('thDay')}</th><th>${t('thStart')}</th><th>${t('thEnd')}</th><th>${t('thDuration')}</th></tr></thead>
-      <tbody>${entries.map(e => `<tr><td>${e.date}</td><td class="td-day">${getDayName(e.date)}</td><td class="td-mono">${e.start_time}</td><td class="td-mono">${e.end_time}</td><td class="td-mono td-duration">${minutesToHHMM(e.duration)}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>${t('thDate')}</th><th>${t('thDay')}</th><th>${t('thStart')}</th><th>${t('thEnd')}</th><th>${t('thDuration')}</th><th>${t('thNotes')}</th></tr></thead>
+      <tbody>${entries.map(e => `<tr><td>${e.date}</td><td class="td-day">${getDayName(e.date)}</td><td class="td-mono">${e.start_time}</td><td class="td-mono">${e.end_time}</td><td class="td-mono td-duration">${minutesToHHMM(e.duration)}</td><td class="td-notes">${escHtml(e.notes)}</td></tr>`).join('')}</tbody>
     </table></div>
     <div style="margin-top:1rem;padding:1rem;background:var(--green-pale);border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center;">
       <span style="font-weight:600;color:var(--green);">${t('totalHoursLabel')}</span>
@@ -1921,13 +1926,14 @@ async function renderAdminEmployeeDetail() {
 
   const tbody = document.getElementById('admin-emp-body');
   if (!entries.length) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div><h3>${t('emptyEntries')}</h3></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><h3>${t('emptyEntries')}</h3></div></td></tr>`;
     return;
   }
   tbody.innerHTML = entries.map(e => `<tr>
     <td>${e.date}</td><td class="td-day">${getDayName(e.date)}</td>
     <td class="td-mono">${e.start_time}</td><td class="td-mono">${e.end_time}</td>
     <td class="td-mono td-duration">${minutesToHHMM(e.duration)}</td>
+    <td class="td-notes">${escHtml(e.notes)}</td>
     <td><div class="td-actions">
       <button class="btn btn-outline btn-sm btn-icon" onclick="openEdit(${e.id})">✏️</button>
       <button class="btn btn-outline btn-sm btn-icon" onclick="openDelete(${e.id})">🗑️</button>
@@ -1977,8 +1983,8 @@ async function renderAdminSummary() {
         <div style="margin-left:auto;font-family:var(--mono);font-weight:600;color:var(--green);">${minutesToHHMM(r.stats.totalMin)} · ${r.stats.days} ${lang==='nl'?'dagen':'days'}</div>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>${t('thDate')}</th><th>${t('thDay')}</th><th>${t('thStart')}</th><th>${t('thEnd')}</th><th>${t('thDuration')}</th></tr></thead>
-        <tbody>${r.entries.map(e => `<tr><td>${e.date}</td><td class="td-day">${getDayName(e.date)}</td><td class="td-mono">${e.start_time}</td><td class="td-mono">${e.end_time}</td><td class="td-mono td-duration">${minutesToHHMM(e.duration)}</td></tr>`).join('')}</tbody>
+        <thead><tr><th>${t('thDate')}</th><th>${t('thDay')}</th><th>${t('thStart')}</th><th>${t('thEnd')}</th><th>${t('thDuration')}</th><th>${t('thNotes')}</th></tr></thead>
+        <tbody>${r.entries.map(e => `<tr><td>${e.date}</td><td class="td-day">${getDayName(e.date)}</td><td class="td-mono">${e.start_time}</td><td class="td-mono">${e.end_time}</td><td class="td-mono td-duration">${minutesToHHMM(e.duration)}</td><td class="td-notes">${escHtml(e.notes)}</td></tr>`).join('')}</tbody>
       </table></div>
     </div><hr style="border:none;border-top:1px solid var(--border);margin-bottom:1.5rem;">`;
   }).join('');

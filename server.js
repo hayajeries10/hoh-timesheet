@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const crypto = require('crypto');
+const { runTimesheetImport } = require('./scripts/import-timesheet');
 
 const app = express();
 const pool = new Pool({
@@ -72,6 +73,7 @@ async function setupDatabase() {
     -- Split shifts (e.g. a morning + evening block on the same day) need more than one
     -- entry per person per day, so the old one-per-day constraint has to go.
     ALTER TABLE entries DROP CONSTRAINT IF EXISTS entries_user_id_date_key;
+    ALTER TABLE entries ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
     CREATE TABLE IF NOT EXISTS shifts (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -615,6 +617,22 @@ app.listen(PORT, () => {
   console.log(`\n🏠 House of Habits Timesheet running at http://localhost:${PORT}\n`);
   setupDatabase()
     .then(() => seedDatabase())
+    .then(async () => {
+      // One-time import of the Google Sheet data. Only runs when RUN_TIMESHEET_IMPORT=true
+      // is set on Railway, and never more than once (see scripts/import-timesheet.js).
+      // RUN_TIMESHEET_IMPORT=dry-run previews it in the logs without changing anything.
+      const mode = process.env.RUN_TIMESHEET_IMPORT;
+      if (mode !== 'true' && mode !== 'dry-run') return;
+      const dryRun = mode === 'dry-run';
+      try {
+        const report = await runTimesheetImport(pool, { dryRun });
+        if (report === null) console.log('Timesheet import: already applied, skipping.');
+        else {
+          console.log(dryRun ? 'Timesheet import DRY RUN (nothing changed):' : 'Timesheet import: done.');
+          for (const r of report) console.log(`  ${r.what.padEnd(7)} ${String(r.name).padEnd(10)} ${String(r.email).padEnd(32)} ${r.entries ?? ''} ${r.minutes ?? ''}`);
+        }
+      } catch (e) { console.error('Timesheet import failed, nothing was changed:', e.message); }
+    })
     .then(() => {
       console.log('   Admin:    hayajeries10@gmail.com / HoH@Admin2026');
       console.log('   Employees default password: habits2026\n');
