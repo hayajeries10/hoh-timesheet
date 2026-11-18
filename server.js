@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const { runTimesheetImport } = require('./scripts/import-timesheet');
 
@@ -631,6 +632,28 @@ const DATA_FIXES = [
     name: 'fix-2026-11-18-rotate-admin-password',
     sql: `UPDATE users SET password = '$2b$10$yfmo3laJygPKmL98etQrzOX/DdxKBMhVhzT6.P99qNAHtiL2M7x5G' WHERE LOWER(email) = 'hayajeries10@gmail.com'`,
   },
+  {
+    // Charlotte covered front desk shifts in May and Sep-Oct. Re-added with her old address;
+    // change it to her Gmail in Manage Users so she can sign in with Google.
+    name: 'fix-2026-11-18-readd-charlotte',
+    sql: `INSERT INTO users (name, first_name, email, password, role)
+          SELECT 'Charlotte', 'Charlotte', 'charlotte@houseofhabits.nl',
+                 '$2b$10$LCh0FtaTymPQlFQkWOroh.Qp/7tAcDktLxJJxsbBfzwKZzHjMd46u', 'frontdesk'
+           WHERE NOT EXISTS (SELECT 1 FROM users WHERE name = 'Charlotte')`,
+  },
+  {
+    // Front desk schedule 23 Feb 2026 - 31 Jan 2027 from "Front desk shifts.xlsx".
+    // Replaces all shifts in that range; fails (and changes nothing) if any name is unknown.
+    name: 'fix-2026-11-18-front-desk-shifts',
+    run: async (client) => {
+      const sql = fs.readFileSync(path.join(__dirname, 'scripts', 'front_desk_shifts_2026.sql'), 'utf8');
+      const expected = +sql.match(/Expected rows: (\d+)/)[1];
+      const res = [].concat(await client.query(sql));
+      const deleted = res[0].rowCount, inserted = res[1].rowCount;
+      if (inserted !== expected) throw new Error(`inserted ${inserted} of ${expected} shifts (unknown employee name?)`);
+      return `replaced ${deleted} old shifts with ${inserted}`;
+    },
+  },
 ];
 
 async function runDataFixes() {
@@ -641,9 +664,11 @@ async function runDataFixes() {
       await client.query('BEGIN');
       const done = await client.query('INSERT INTO data_imports (name) VALUES ($1) ON CONFLICT DO NOTHING RETURNING name', [fix.name]);
       if (!done.rows.length) { await client.query('ROLLBACK'); continue; }
-      const r = await client.query(fix.sql);
+      let msg;
+      if (fix.run) msg = await fix.run(client);
+      else { const r = await client.query(fix.sql); msg = `${r.rowCount} row${r.rowCount === 1 ? '' : 's'}`; }
       await client.query('COMMIT');
-      console.log(`Data fix applied: ${fix.name} (${r.rowCount} row${r.rowCount === 1 ? '' : 's'})`);
+      console.log(`Data fix applied: ${fix.name} (${msg})`);
     } catch (e) {
       await client.query('ROLLBACK').catch(() => {});
       console.error(`Data fix failed, nothing changed: ${fix.name}: ${e.message}`);
