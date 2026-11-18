@@ -103,13 +103,15 @@ async function seedDatabase() {
   try {
     await client.query('BEGIN');
 
-    const adminHash = bcrypt.hashSync('HoH@Admin2026', 10);
+    // Only used when the database is completely empty. Passwords are never logged;
+    // set ADMIN_PASSWORD / EMPLOYEE_PASSWORD on Railway if you need known ones.
+    const adminHash = bcrypt.hashSync(process.env.ADMIN_PASSWORD || crypto.randomBytes(18).toString('base64url'), 10);
     await client.query(
       'INSERT INTO users (name, email, password, role, is_admin) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO NOTHING',
       ['Admin', 'hayajeries10@gmail.com', adminHash, 'employee', true]
     );
 
-    const empHash = bcrypt.hashSync('habits2026', 10);
+    const empHash = bcrypt.hashSync(process.env.EMPLOYEE_PASSWORD || crypto.randomBytes(18).toString('base64url'), 10);
     const employees = [
       { name: 'Haya',      email: 'haya@houseofhabits.nl',      role: 'frontdesk' },
       { name: 'Caitilin',  email: 'caitilin@houseofhabits.nl',  role: 'frontdesk' },
@@ -612,6 +614,43 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// ── ONE-TIME DATA FIXES ─────────────────────────────────
+// Each fix runs once, in its own transaction, and is recorded in data_imports so it never
+// runs again. Add new fixes to the end of the list; never edit or reorder old ones.
+const DATA_FIXES = [
+  {
+    name: 'fix-2026-11-18-elmira-evening-shift',
+    sql: `INSERT INTO entries (user_id, date, start_time, end_time, duration, notes)
+          SELECT id, '2026-11-18', '16:30', '21:00', 270, '' FROM users
+           WHERE LOWER(email) = 'sarramielmira2005@gmail.com'
+             AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.user_id = users.id
+                              AND e.date = '2026-11-18' AND e.start_time = '16:30')`,
+  },
+  {
+    // The old admin password was public in this repo and printed in the logs.
+    name: 'fix-2026-11-18-rotate-admin-password',
+    sql: `UPDATE users SET password = '$2b$10$yfmo3laJygPKmL98etQrzOX/DdxKBMhVhzT6.P99qNAHtiL2M7x5G' WHERE LOWER(email) = 'hayajeries10@gmail.com'`,
+  },
+];
+
+async function runDataFixes() {
+  await pool.query('CREATE TABLE IF NOT EXISTS data_imports (name TEXT PRIMARY KEY, ran_at TIMESTAMP DEFAULT NOW())');
+  for (const fix of DATA_FIXES) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const done = await client.query('INSERT INTO data_imports (name) VALUES ($1) ON CONFLICT DO NOTHING RETURNING name', [fix.name]);
+      if (!done.rows.length) { await client.query('ROLLBACK'); continue; }
+      const r = await client.query(fix.sql);
+      await client.query('COMMIT');
+      console.log(`Data fix applied: ${fix.name} (${r.rowCount} row${r.rowCount === 1 ? '' : 's'})`);
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.error(`Data fix failed, nothing changed: ${fix.name}: ${e.message}`);
+    } finally { client.release(); }
+  }
+}
+
 // ── START ────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🏠 House of Habits Timesheet running at http://localhost:${PORT}\n`);
@@ -633,9 +672,6 @@ app.listen(PORT, () => {
         }
       } catch (e) { console.error('Timesheet import failed, nothing was changed:', e.message); }
     })
-    .then(() => {
-      console.log('   Admin:    hayajeries10@gmail.com / HoH@Admin2026');
-      console.log('   Employees default password: habits2026\n');
-    })
+    .then(() => runDataFixes())
     .catch(e => console.error('DB setup error:', e.message));
 });
